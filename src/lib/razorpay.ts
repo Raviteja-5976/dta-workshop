@@ -52,6 +52,11 @@ export async function createRazorpayPaymentLink(
   // Razorpay expects amount in paise (1 INR = 100 Paise)
   const amountInPaise = Math.round(amountInRupees * 100);
 
+  // After a successful payment Razorpay redirects the customer here (GET with
+  // razorpay_payment_id / _link_id / _reference_id / _status / signature appended).
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://workshop.devtrackacademy.com').replace(/\/$/, '');
+  const callbackUrl = `${siteUrl}/payments/success`;
+
   // Clean phone number (Razorpay requires phone to include country code or be a valid string)
   let contact = customer.phone?.replace(/[^0-9+]/g, '');
   if (contact && !contact.startsWith('+')) {
@@ -75,6 +80,8 @@ export async function createRazorpayPaymentLink(
         accept_partial: false,
         reference_id: registrationId,
         description: description.substring(0, 100), // Max 100 characters in description
+        callback_url: callbackUrl,
+        callback_method: 'get',
         customer: {
           name: customer.name,
           email: customer.email,
