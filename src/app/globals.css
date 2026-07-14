@@ -1,26 +1,139 @@
 @import "tailwindcss";
 
+@theme {
+  /* Custom Color Palette */
+  --color-primary-orange: #FF6B35;
+  --color-deep-navy: #1B1F3B;
+  --color-bg-cream: #FFF8F0;
+  --color-mint: #6EE7B7;
+  --color-sky: #4EA8FF;
+  --color-coral: #FF5C7A;
+  --color-yellow: #FFD54F;
+  --color-text-navy: #1B1F3B;
+  --color-success: #34D399;
+  --color-warning: #F59E0B;
+
+  /* Custom Font Mapping */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-signature: var(--font-dancing-script), cursive;
+
+  /* Custom Shadows */
+  --shadow-neo: 4px 4px 0px 0px #1B1F3B;
+  --shadow-neo-lg: 8px 8px 0px 0px #1B1F3B;
+  --shadow-neo-orange: 4px 4px 0px 0px #FF6B35;
+  --shadow-neo-mint: 4px 4px 0px 0px #6EE7B7;
+  --shadow-neo-inset: inset 2px 2px 0px 0px #1B1F3B;
+
+  /* Custom Radius */
+  --radius-neo: 24px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #FFF8F0;
+  --foreground: #1B1F3B;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FFF8F0;
+  border-left: 4px solid #1B1F3B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1B1F3B;
+  border: 2px solid #FFF8F0;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF6B35;
+}
+
+/* Lenis Smooth Scroll Configuration */
+html.lenis {
+  height: auto;
+}
+
+.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis-smooth [data-lenis-prevent] {
+  overflow: clip;
+}
+
+/* Neo Brutalist Animations & Deco */
+.marker-highlight {
+  position: relative;
+  display: inline-block;
+  z-index: 1;
+}
+
+.marker-highlight::after {
+  content: "";
+  position: absolute;
+  bottom: 0.1em;
+  left: -0.1em;
+  width: 104%;
+  height: 0.35em;
+  background-color: #FFD54F;
+  z-index: -1;
+  transform: rotate(-1deg);
+  border-radius: 2px;
+  animation: draw-marker 1s ease-out forwards;
+  transform-origin: left;
+}
+
+.marker-highlight-orange::after {
+  background-color: #FF6B35;
+}
+
+@keyframes draw-marker {
+  from {
+    transform: scaleX(0) rotate(-1deg);
+  }
+  to {
+    transform: scaleX(1) rotate(-1deg);
+  }
+}
+
+/* Grid Background */
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(27, 31, 59, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27, 31, 59, 0.05) 1px, transparent 1px);
+}
+
+/* Floating Animations */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 4.5s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.animate-float-slow {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 0.5s;
 }
