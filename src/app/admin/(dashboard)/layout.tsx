@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server';
 import { isMock } from '@/lib/supabase/config';
 import { AdminShell } from '@/components/Layout/AdminShell';
 
+// Admin pages read cookies (auth session) and must be rendered per-request.
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDashboardLayout({
   children,
 }: {

@@ -13,6 +13,9 @@ import CTA from '@/components/Sections/CTA';
 import Footer from '@/components/Layout/Footer';
 import { getWorkshops } from '@/lib/data/workshops';
 
+// getWorkshops reads cookies via the Supabase server client, so render per-request.
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   const workshops = await getWorkshops();
 
