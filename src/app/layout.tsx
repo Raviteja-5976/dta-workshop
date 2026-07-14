@@ -25,9 +25,6 @@ const alexBrush = Alex_Brush({
 export const metadata: Metadata = {
   title: "Workshop.DevTrackAcademy | Build. Break. Learn. Repeat.",
   description: "Join live, small-batch, mentor-driven coding workshops where you build real projects, complete assignments, and receive direct mentor feedback.",
-  icons: {
-    icon: "/logo.png",
-  }
 };
 
 export default function RootLayout({
