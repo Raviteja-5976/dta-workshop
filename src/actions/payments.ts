@@ -2,6 +2,7 @@
 
 import { assertAdmin } from '@/lib/auth';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { createRazorpayPaymentLink } from '@/lib/razorpay';
 import { revalidatePath } from 'next/cache';
 import { isMock } from '@/lib/supabase/config';
@@ -216,13 +217,16 @@ export async function mockProcessPaymentAction(registrationId: string, batchId: 
  */
 export async function registerStudentAction(batchId: string) {
   try {
-    const supabase = await getAdminClient();
-    
-    // 1. Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // 1. Get authenticated user from the cookie-based client. The service-role admin
+    // client has no session attached, so auth.getUser() would return null there.
+    const authClient = await createClient();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
       return { success: false, error: 'You must be logged in to register.' };
     }
+
+    // Privileged DB reads/writes use the admin (service-role) client to bypass RLS.
+    const supabase = await getAdminClient();
 
     // 2. Fetch batch metadata (price & workshop details)
     const { data: batch, error: batchError } = await supabase
@@ -329,13 +333,14 @@ export async function registerStudentAction(batchId: string) {
  */
 export async function processStudentMockPaymentAction(registrationId: string) {
   try {
-    const supabase = await getAdminClient();
-    
-    // 1. Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // 1. Get authenticated user from the cookie-based client (see registerStudentAction).
+    const authClient = await createClient();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
       return { success: false, error: 'You must be logged in to complete payment.' };
     }
+
+    const supabase = await getAdminClient();
 
     // 2. Fetch and verify registration ownership
     const { data: reg, error: regError } = await supabase
