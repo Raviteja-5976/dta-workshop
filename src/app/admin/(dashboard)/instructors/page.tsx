@@ -8,16 +8,19 @@ export default async function InstructorsPage() {
 
   if (isMock) {
     instructors = [
-      { id: 'mock-1', name: 'Alex Coder', title: 'Lead Architect', bio: 'Alex is a lead architect with 10+ years experience building cloud applications.' },
-      { id: 'mock-2', name: 'Sarah Dev', title: 'Principal AI Engineer', bio: 'Sarah leads AI development projects at tech firms and specializes in LLM integrations.' }
+      { id: 'mock-1', full_name: 'Alex Coder', email: 'alex@dta.com', phone: null },
+      { id: 'mock-2', full_name: 'Sarah Dev', email: 'sarah@dta.com', phone: null }
     ];
   } else {
     try {
       const supabase = await createClient();
+      // Instructors are profiles whose role = 'instructor'. Set the role in the
+      // profiles table (or via the admin UI) to add someone here.
       const { data } = await supabase
-        .from('instructors')
-        .select('*')
-        .order('name');
+        .from('profiles')
+        .select('id, full_name, email, phone')
+        .eq('role', 'instructor')
+        .order('full_name');
       instructors = data || [];
     } catch (e) {
       console.error('Failed to load instructors list:', e);
@@ -40,23 +43,24 @@ export default async function InstructorsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
         {instructors.length === 0 ? (
           <p className="text-sm font-semibold text-deep-navy/40 py-8 col-span-2 text-center">
-            No instructors registered in the database.
+            No instructors yet. Set a user&apos;s role to &lsquo;instructor&rsquo; in the profiles table to add one.
           </p>
         ) : (
           instructors.map(inst => (
             <NeoCard key={inst.id} className="p-6 space-y-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl border-2 border-deep-navy bg-primary-orange flex items-center justify-center font-display font-black text-white text-lg">
-                  {inst.name[0].toUpperCase()}
+                  {(inst.full_name || inst.email || '?')[0].toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-display font-black text-lg text-deep-navy capitalize">{inst.name}</h3>
-                  <p className="text-xs font-bold text-deep-navy/50">{inst.title || 'Instructor'}</p>
+                  <h3 className="font-display font-black text-lg text-deep-navy capitalize">{inst.full_name || 'Unnamed'}</h3>
+                  <p className="text-xs font-bold text-deep-navy/50">Instructor</p>
                 </div>
               </div>
-              <p className="text-sm font-semibold text-deep-navy/80 leading-relaxed">
-                {inst.bio || 'No biography has been added yet.'}
-              </p>
+              <div className="text-sm font-semibold text-deep-navy/80 leading-relaxed space-y-1">
+                <p>{inst.email || 'No email on file.'}</p>
+                {inst.phone && <p className="text-deep-navy/50">{inst.phone}</p>}
+              </div>
             </NeoCard>
           ))
         )}

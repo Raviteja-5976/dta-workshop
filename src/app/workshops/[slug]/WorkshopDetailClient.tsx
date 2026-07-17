@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   ArrowLeft,
   ChevronRight,
-  Info,
   ExternalLink
 } from 'lucide-react';
 import Navbar from '@/components/Layout/Navbar';
@@ -31,14 +30,18 @@ export default function WorkshopDetailClient({
   workshop,
   relatedWorkshops,
   slug,
+  registrationStatus,
 }: {
   workshop?: Workshop;
   relatedWorkshops: Workshop[];
   slug: string;
+  registrationStatus?: string;
 }) {
   const router = useRouter();
   const { user } = useAuthStore();
   const [registering, setRegistering] = useState(false);
+  const isRegistered = !!registrationStatus;
+  const isConfirmed = registrationStatus === 'confirmed';
 
   // Handle Share Click
   const handleShare = () => {
@@ -232,7 +235,10 @@ export default function WorkshopDetailClient({
                                   month: 'short',
                                   hour: '2-digit',
                                   minute: '2-digit',
-                                  timeZone: 'Asia/Kolkata',
+                                  // scheduled_at is stored as the naive wall-clock time the
+                                  // admin entered (batch timezone), so render it as-is (UTC)
+                                  // rather than re-shifting it by the IST offset.
+                                  timeZone: 'UTC',
                                 })}{' '}
                                 IST
                               </span>
@@ -268,20 +274,6 @@ export default function WorkshopDetailClient({
                 </div>
               </div>
             )}
-
-            {/* Why Only 50 Students Mint Card */}
-            <NeoCard variant="mint" borderSize="thick" className="p-6 md:p-8 text-left space-y-4 -rotate-0.5">
-              <h3 className="font-display font-black text-2xl md:text-3xl text-deep-navy leading-none">
-                Why Only 50 Students?
-              </h3>
-              <p className="font-sans font-semibold text-sm md:text-base text-deep-navy/90 leading-relaxed">
-                Unlike large webinars with thousands of passive listeners, every workshop we run has strictly capped seats. This allows instructors to answer individual questions, review assignments, provide personalized guidance, and ensure that no participant feels left behind.
-              </p>
-              <div className="border-2 border-deep-navy bg-yellow p-3.5 rounded-xl flex items-center gap-2 shadow-[2px_2px_0px_0px_#1B1F3B] font-sans font-black text-xs">
-                <Info size={16} className="text-deep-navy shrink-0" />
-                <span>Mentor support includes direct code feedback and pull request checks.</span>
-              </div>
-            </NeoCard>
 
             {/* FAQs */}
             {workshop.faq.length > 0 && (
@@ -380,7 +372,7 @@ export default function WorkshopDetailClient({
                   Batch filling fast
                 </span>
                 <h3 className="font-display font-black text-2xl text-deep-navy leading-none pt-1">
-                  Join Batch 1
+                  Join {workshop.batchLabel || 'This Batch'}
                 </h3>
               </div>
 
@@ -413,16 +405,34 @@ export default function WorkshopDetailClient({
 
               {/* Actions */}
               <div className="flex flex-col gap-2 pt-2">
-                <NeoButton
-                  variant="orange"
-                  size="md"
-                  className="w-full"
-                  onClick={handleRegister}
-                  disabled={registering}
-                >
-                  {registering ? 'Registering...' : 'Register Now'}
-                  <ChevronRight size={14} className="ml-1" />
-                </NeoButton>
+                {isRegistered ? (
+                  <>
+                    <div className="w-full border-3 border-deep-navy bg-mint rounded-xl px-4 py-2.5 text-center font-display font-black text-sm uppercase text-deep-navy shadow-[2px_2px_0px_0px_#1B1F3B] flex items-center justify-center gap-1.5">
+                      <CheckCircle2 size={16} className="stroke-[3]" />
+                      {isConfirmed ? "You're Registered" : 'Payment Pending'}
+                    </div>
+                    <NeoButton
+                      variant="orange"
+                      size="md"
+                      className="w-full"
+                      onClick={() => router.push('/dashboard')}
+                    >
+                      {isConfirmed ? 'Go to Dashboard' : 'Complete Payment'}
+                      <ChevronRight size={14} className="ml-1" />
+                    </NeoButton>
+                  </>
+                ) : (
+                  <NeoButton
+                    variant="orange"
+                    size="md"
+                    className="w-full"
+                    onClick={handleRegister}
+                    disabled={registering}
+                  >
+                    {registering ? 'Registering...' : 'Register Now'}
+                    <ChevronRight size={14} className="ml-1" />
+                  </NeoButton>
+                )}
                 <NeoButton
                   variant="white"
                   size="sm"
@@ -443,9 +453,15 @@ export default function WorkshopDetailClient({
             <span className="font-display font-bold text-[10px] text-deep-navy/55 uppercase leading-none block">Featured Batch</span>
             <span className="font-display font-black text-xl text-deep-navy mt-1 block">₹{workshop.price}</span>
           </div>
-          <NeoButton variant="orange" size="sm" onClick={handleRegister} disabled={registering}>
-            {registering ? 'Registering...' : 'Register'} <ChevronRight size={12} className="ml-0.5" />
-          </NeoButton>
+          {isRegistered ? (
+            <NeoButton variant="mint" size="sm" onClick={() => router.push('/dashboard')}>
+              {isConfirmed ? 'Registered ✓' : 'Payment Pending'} <ChevronRight size={12} className="ml-0.5" />
+            </NeoButton>
+          ) : (
+            <NeoButton variant="orange" size="sm" onClick={handleRegister} disabled={registering}>
+              {registering ? 'Registering...' : 'Register'} <ChevronRight size={12} className="ml-0.5" />
+            </NeoButton>
+          )}
         </div>
 
       </main>

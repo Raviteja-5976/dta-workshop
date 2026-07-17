@@ -25,7 +25,7 @@ export const CTA = () => {
         </p>
 
         <div className="flex flex-wrap gap-4 items-center justify-center pt-4">
-          <Link href="/auth">
+          <Link href="/workshops">
             <NeoButton variant="yellow" size="lg">
               Register Now
               <ArrowRight className="w-5 h-5 ml-1 stroke-[3]" />

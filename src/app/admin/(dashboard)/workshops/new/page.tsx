@@ -9,11 +9,14 @@ export default async function NewWorkshopPage() {
   if (!isMock) {
     try {
       const supabase = await createClient();
+      // Instructors = profiles with role 'instructor'. Map full_name -> name so
+      // the WorkshopForm's { id, name } contract stays unchanged.
       const { data } = await supabase
-        .from('instructors')
-        .select('id, name')
-        .order('name');
-      instructors = data || [];
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'instructor')
+        .order('full_name');
+      instructors = (data || []).map(p => ({ id: p.id, name: p.full_name || 'Unnamed' }));
     } catch (e) {
       console.error('Failed to fetch instructors for new workshop:', e);
     }

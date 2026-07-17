@@ -116,7 +116,7 @@ export const FeaturedWorkshop = ({ workshops = workshopsData }: { workshops?: Wo
                         className="w-full"
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push('/auth');
+                          router.push(`/workshops/${workshop.slug}`);
                         }}
                       >
                         Register Now

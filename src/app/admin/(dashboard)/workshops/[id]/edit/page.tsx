@@ -44,12 +44,14 @@ export default async function EditWorkshopPage({ params }: EditWorkshopPageProps
       if (error) throw error;
       workshop = data;
 
-      // Fetch instructors list
+      // Instructors = profiles with role 'instructor'. Map full_name -> name so
+      // the WorkshopForm's { id, name } contract stays unchanged.
       const { data: instData } = await supabase
-        .from('instructors')
-        .select('id, name')
-        .order('name');
-      instructors = instData || [];
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'instructor')
+        .order('full_name');
+      instructors = (instData || []).map(p => ({ id: p.id, name: p.full_name || 'Unnamed' }));
 
     } catch (e) {
       console.error('Failed to fetch workshop for editing:', e);

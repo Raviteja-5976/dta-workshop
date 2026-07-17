@@ -22,6 +22,7 @@ export interface LearningOutcome {
 export interface Workshop {
   id?: string;
   batchId?: string;
+  batchLabel?: string;
   title: string;
   slug: string;
   coverImage?: string;

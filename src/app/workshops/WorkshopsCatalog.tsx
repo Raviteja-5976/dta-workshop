@@ -9,7 +9,13 @@ import { NeoCard } from '@/components/UI/NeoCard';
 import { NeoButton } from '@/components/UI/NeoButton';
 import { Workshop } from '@/data/workshops';
 
-export default function WorkshopsCatalog({ workshops }: { workshops: Workshop[] }) {
+export default function WorkshopsCatalog({
+  workshops,
+  registeredBatches = {},
+}: {
+  workshops: Workshop[];
+  registeredBatches?: Record<string, string>;
+}) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string[]>([]);
@@ -181,6 +187,7 @@ export default function WorkshopsCatalog({ workshops }: { workshops: Workshop[] 
                 {filteredWorkshops.map((shop, i) => {
                   const colors = ['yellow', 'sky', 'mint', 'coral'];
                   const themeColor = colors[i % colors.length];
+                  const regStatus = shop.batchId ? registeredBatches[shop.batchId] : undefined;
 
                   return (
                     <NeoCard
@@ -258,14 +265,24 @@ export default function WorkshopsCatalog({ workshops }: { workshops: Workshop[] 
 
                       {/* Buttons */}
                       <div className="w-full grid grid-cols-2 gap-3 pt-2">
-                        <NeoButton
-                          variant={shop.status === 'Completed' ? 'white' : 'orange'}
-                          size="sm"
-                          disabled={shop.status === 'Completed'}
-                          onClick={() => router.push('/auth')}
-                        >
-                          Register
-                        </NeoButton>
+                        {regStatus ? (
+                          <NeoButton
+                            variant="mint"
+                            size="sm"
+                            onClick={() => router.push('/dashboard')}
+                          >
+                            {regStatus === 'confirmed' ? 'Registered ✓' : 'Payment Pending'}
+                          </NeoButton>
+                        ) : (
+                          <NeoButton
+                            variant={shop.status === 'Completed' ? 'white' : 'orange'}
+                            size="sm"
+                            disabled={shop.status === 'Completed'}
+                            onClick={() => router.push(`/workshops/${shop.slug}`)}
+                          >
+                            Register
+                          </NeoButton>
+                        )}
                         <NeoButton
                           variant="white"
                           size="sm"

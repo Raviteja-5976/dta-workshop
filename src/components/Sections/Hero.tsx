@@ -69,7 +69,7 @@ export const Hero = () => {
                 Browse Workshops
               </NeoButton>
             </a>
-            <Link href="/auth">
+            <Link href="/workshops">
               <NeoButton variant="white" size="lg">
                 Register Now
               </NeoButton>

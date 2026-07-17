@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Rss } from 'lucide-react';
-import { FaGithub, FaTwitter, FaLinkedin } from 'react-icons/fa6';
+import { FaDiscord, FaXTwitter, FaInstagram, FaLinkedin, FaReddit } from 'react-icons/fa6';
 import { NeoButton } from '@/components/UI/NeoButton';
 
 export const Footer = () => {
@@ -32,13 +32,17 @@ export const Footer = () => {
           </p>
           <div className="flex items-center gap-3">
             {[
-              { icon: FaGithub, href: '#' },
-              { icon: FaTwitter, href: '#' },
-              { icon: FaLinkedin, href: '#' },
+              { icon: FaDiscord, href: 'https://discord.gg/dftPTfdde' },
+              { icon: FaXTwitter, href: 'https://x.com/DevTrackAcademy' },
+              { icon: FaInstagram, href: 'https://www.instagram.com/devtrackacademy/' },
+              { icon: FaLinkedin, href: 'https://www.linkedin.com/company/devtrackacademy' },
+              { icon: FaReddit, href: 'https://www.reddit.com/r/devtrackacademy/' },
             ].map((social, i) => (
               <a
                 key={i}
                 href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 border-2 border-deep-navy bg-yellow rounded-xl flex items-center justify-center shadow-[2px_2px_0px_0px_#1B1F3B] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[4px_4px_0px_0px_#1B1F3B] transition-all cursor-pointer"
               >
                 <social.icon className="w-5 h-5 text-deep-navy" />

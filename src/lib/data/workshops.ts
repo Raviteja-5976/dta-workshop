@@ -32,12 +32,13 @@ type WorkshopRow = {
   highlights: string[] | string | null;
   learning_outcomes: Workshop['learningOutcomes'] | string | null;
   faq: Workshop['faq'] | string | null;
-  instructors: { name: string } | null;
+  default_instructor_id: string | null;
   workshop_batches: BatchRow[] | null;
 };
 
 type BatchRow = {
   id: string;
+  batch_label: string | null;
   status: Workshop['status'];
   date_label: string | null;
   start_date: string | null;
@@ -63,9 +64,9 @@ type SessionRow = {
 const WORKSHOP_SELECT = `
   id, slug, title, description, about_text, cover_image, difficulty, category,
   highlights, learning_outcomes, faq,
-  instructors:default_instructor_id ( name ),
+  default_instructor_id,
   workshop_batches (
-    id, status, date_label, start_date, duration_label, num_sessions,
+    id, batch_label, status, date_label, start_date, duration_label, num_sessions,
     price, original_price, seat_limit,
     batch_sessions ( session_order, title, about, duration_label, scheduled_at, topics, assignment, resources )
   )
@@ -110,13 +111,98 @@ function mapSessions(sessions: SessionRow[] | null): SessionDetails[] {
     }));
 }
 
-function mapRow(row: WorkshopRow): Workshop {
+// Instructors live in `profiles` (role = 'instructor'), which is NOT publicly
+// readable — that table holds PII (email/phone). So we resolve instructor names
+// on the server with the service-role client and only ever surface the name.
+// If the service-role key isn't configured, names fall back to 'DTA Team'.
+async function fetchInstructorNames(
+  ids: Array<string | null>
+): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(ids.filter((id): id is string => !!id)));
+  const names = new Map<string, string>();
+  if (unique.length === 0) return names;
+
+  try {
+    const { getAdminClient } = await import('@/lib/supabase/admin');
+    const supabase = await getAdminClient();
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', unique);
+    for (const p of data ?? []) {
+      if (p.full_name) names.set(p.id, p.full_name);
+    }
+  } catch (e) {
+    console.error('fetchInstructorNames failed:', e);
+  }
+  return names;
+}
+
+// Real remaining-seat counts come from the batch_seat_status view (seat_limit
+// minus confirmed registrations). Read with the service-role client so RLS on
+// registrations doesn't undercount for anonymous/other visitors.
+async function fetchSeatsRemaining(
+  batchIds: Array<string | null>
+): Promise<Map<string, number>> {
+  const unique = Array.from(new Set(batchIds.filter((id): id is string => !!id)));
+  const remaining = new Map<string, number>();
+  if (unique.length === 0) return remaining;
+
+  try {
+    const { getAdminClient } = await import('@/lib/supabase/admin');
+    const supabase = await getAdminClient();
+    const { data } = await supabase
+      .from('batch_seat_status')
+      .select('batch_id, seats_remaining')
+      .in('batch_id', unique);
+    for (const s of data ?? []) {
+      if (typeof s.seats_remaining === 'number') {
+        remaining.set(s.batch_id, s.seats_remaining);
+      }
+    }
+  } catch (e) {
+    console.error('fetchSeatsRemaining failed:', e);
+  }
+  return remaining;
+}
+
+// Build a display date range ("18 - 19 Jul", or "18 Jul" for a single day) from
+// the actual session schedule, so the workshop date always matches the sessions.
+// scheduled_at is a naive wall-clock stored as UTC, so format in UTC to avoid a
+// timezone shift (mirrors the session-time rendering on the detail page).
+function formatSessionDateRange(sessions: SessionDetails[]): string | undefined {
+  const times = sessions
+    .map((s) => s.scheduledAt)
+    .filter((d): d is string => !!d)
+    .map((d) => Date.parse(d))
+    .filter((n) => !Number.isNaN(n));
+  if (times.length === 0) return undefined;
+
+  const min = new Date(Math.min(...times));
+  const max = new Date(Math.max(...times));
+  const dayMonth = (d: Date) =>
+    d.toLocaleString('en-IN', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+  const day = (d: Date) =>
+    d.toLocaleString('en-IN', { day: '2-digit', timeZone: 'UTC' });
+
+  const sameDay = min.toISOString().slice(0, 10) === max.toISOString().slice(0, 10);
+  return sameDay ? dayMonth(min) : `${day(min)} - ${dayMonth(max)}`;
+}
+
+function mapRow(
+  row: WorkshopRow,
+  instructorNames: Map<string, string>,
+  seatsRemaining: Map<string, number>
+): Workshop {
   const batch = pickPrimaryBatch(row.workshop_batches);
   const schedule = mapSessions(batch?.batch_sessions ?? null);
+  const primaryRemaining = batch ? seatsRemaining.get(batch.id) : undefined;
+  const sessionDateRange = formatSessionDateRange(schedule);
 
   return {
     id: row.id,
     batchId: batch?.id,
+    batchLabel: batch?.batch_label ?? undefined,
     title: row.title,
     slug: row.slug,
     coverImage: row.cover_image ?? undefined,
@@ -129,13 +215,16 @@ function mapRow(row: WorkshopRow): Workshop {
     price: Number(batch?.price ?? 0),
     originalPrice:
       batch?.original_price != null ? Number(batch.original_price) : undefined,
-    date: batch?.date_label ?? 'TBA',
+    // Prefer the real session dates; fall back to the batch's free-text label.
+    date: sessionDateRange ?? batch?.date_label ?? 'TBA',
     status: batch?.status ?? 'Upcoming',
     seatLimit: batch?.seat_limit ?? 0,
-    // No registrations wired yet, so remaining == limit. The admin/registration
-    // work will swap this for the batch_seat_status view.
-    remainingSeats: batch?.seat_limit ?? 0,
-    instructor: row.instructors?.name ?? 'DTA Team',
+    // Live remaining seats from batch_seat_status; fall back to the limit only
+    // if the view had no row for this batch.
+    remainingSeats: primaryRemaining ?? batch?.seat_limit ?? 0,
+    instructor:
+      (row.default_instructor_id && instructorNames.get(row.default_instructor_id)) ||
+      'DTA Team',
     highlights: safeJsonParse<string[]>(row.highlights, []),
     schedule,
     faq: safeJsonParse<FAQItem[]>(row.faq, []),
@@ -158,7 +247,12 @@ export async function getWorkshops(): Promise<Workshop[]> {
       if (error) console.error('getWorkshops:', error.message);
       return staticWorkshops;
     }
-    return (data as unknown as WorkshopRow[]).map(mapRow);
+    const rows = data as unknown as WorkshopRow[];
+    const [names, seats] = await Promise.all([
+      fetchInstructorNames(rows.map((r) => r.default_instructor_id)),
+      fetchSeatsRemaining(rows.map((r) => pickPrimaryBatch(r.workshop_batches)?.id ?? null)),
+    ]);
+    return rows.map((r) => mapRow(r, names, seats));
   } catch (e) {
     console.error('getWorkshops failed, using static data:', e);
     return staticWorkshops;
@@ -184,7 +278,12 @@ export async function getWorkshopBySlug(
       if (error) console.error('getWorkshopBySlug:', error.message);
       return staticWorkshops.find((w) => w.slug === slug);
     }
-    return mapRow(data as unknown as WorkshopRow);
+    const row = data as unknown as WorkshopRow;
+    const [names, seats] = await Promise.all([
+      fetchInstructorNames([row.default_instructor_id]),
+      fetchSeatsRemaining([pickPrimaryBatch(row.workshop_batches)?.id ?? null]),
+    ]);
+    return mapRow(row, names, seats);
   } catch (e) {
     console.error('getWorkshopBySlug failed, using static data:', e);
     return staticWorkshops.find((w) => w.slug === slug);

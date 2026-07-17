@@ -53,12 +53,14 @@ export default async function BatchesPage({ params }: BatchesPageProps) {
         workshopTitle = ws.title;
       }
 
-      // Fetch instructors
+      // Instructors = profiles with role 'instructor'. Map full_name -> name so
+      // the { id, name } contract the client expects stays unchanged.
       const { data: instData } = await supabase
-        .from('instructors')
-        .select('id, name')
-        .order('name');
-      instructors = instData || [];
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'instructor')
+        .order('full_name');
+      instructors = (instData || []).map(p => ({ id: p.id, name: p.full_name || 'Unnamed' }));
 
       // Fetch batches
       const { data: dbBatches, error } = await supabase
@@ -78,7 +80,7 @@ export default async function BatchesPage({ params }: BatchesPageProps) {
           registration_open,
           payment_link,
           instructor_id,
-          instructors ( name )
+          profiles:instructor_id ( full_name )
         `)
         .eq('workshop_id', id)
         .order('created_at', { ascending: true });
@@ -112,7 +114,7 @@ export default async function BatchesPage({ params }: BatchesPageProps) {
             registration_open: b.registration_open,
             payment_link: b.payment_link,
             instructor_id: b.instructor_id,
-            instructor_name: b.instructors?.name || 'DTA Team'
+            instructor_name: b.profiles?.full_name || 'DTA Team'
           };
         });
       }
