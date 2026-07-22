@@ -1,4 +1,5 @@
 import { isMock } from '@/lib/supabase/config';
+import { resolveCoverImage } from '@/lib/images';
 import {
   workshopsData as staticWorkshops,
   Workshop,
@@ -32,6 +33,8 @@ type WorkshopRow = {
   highlights: string[] | string | null;
   learning_outcomes: Workshop['learningOutcomes'] | string | null;
   faq: Workshop['faq'] | string | null;
+  project_preview_url: string | null;
+  project_preview_enabled: boolean | null;
   default_instructor_id: string | null;
   workshop_batches: BatchRow[] | null;
 };
@@ -64,6 +67,7 @@ type SessionRow = {
 const WORKSHOP_SELECT = `
   id, slug, title, description, about_text, cover_image, difficulty, category,
   highlights, learning_outcomes, faq,
+  project_preview_url, project_preview_enabled,
   default_instructor_id,
   workshop_batches (
     id, batch_label, status, date_label, start_date, duration_label, num_sessions,
@@ -205,7 +209,7 @@ function mapRow(
     batchLabel: batch?.batch_label ?? undefined,
     title: row.title,
     slug: row.slug,
-    coverImage: row.cover_image ?? undefined,
+    coverImage: resolveCoverImage(row.cover_image),
     description: row.description,
     aboutText: row.about_text ?? undefined,
     difficulty: row.difficulty,
@@ -229,6 +233,8 @@ function mapRow(
     schedule,
     faq: safeJsonParse<FAQItem[]>(row.faq, []),
     learningOutcomes: safeJsonParse<LearningOutcome[]>(row.learning_outcomes, []),
+    projectPreviewUrl: row.project_preview_url ?? undefined,
+    projectPreviewEnabled: row.project_preview_enabled ?? false,
   };
 }
 

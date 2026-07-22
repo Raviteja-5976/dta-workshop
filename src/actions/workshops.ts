@@ -5,6 +5,52 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { isMock } from '@/lib/supabase/config';
 
+/**
+ * Uploads a workshop cover image to the Supabase Storage bucket and returns the
+ * stored object path. The path is what gets saved into workshops.cover_image;
+ * resolveCoverImage() turns it into a public URL for display on both the admin
+ * preview and the public/user-facing pages (same image everywhere).
+ */
+export async function uploadWorkshopCoverAction(formData: FormData) {
+  try {
+    await assertAdmin();
+
+    const file = formData.get('file');
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, error: 'No image file provided.' };
+    }
+    if (!file.type.startsWith('image/')) {
+      return { success: false, error: 'Please choose an image file (PNG, JPG, WEBP).' };
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return { success: false, error: 'Image is too large (max 5MB).' };
+    }
+
+    const bucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET;
+    if (isMock || !bucket) {
+      return {
+        success: false,
+        error: 'Image uploads need a live Supabase project with NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET set.',
+      };
+    }
+
+    const supabase = await getAdminClient();
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `covers/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+
+    const { error } = await supabase.storage.from(bucket).upload(path, bytes, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) return { success: false, error: error.message };
+
+    return { success: true, path };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to upload image.' };
+  }
+}
+
 // Simple helper to auto-slugify if needed
 function slugify(text: string): string {
   return text
@@ -57,7 +103,9 @@ export async function createWorkshopAction(formData: any) {
         is_published: formData.is_published !== false,
         highlights: formData.highlights || [],
         learning_outcomes: formData.learning_outcomes || [],
-        faq: formData.faq || []
+        faq: formData.faq || [],
+        project_preview_url: formData.project_preview_url || null,
+        project_preview_enabled: formData.project_preview_enabled === true
       })
       .select('id')
       .single();
@@ -115,7 +163,9 @@ export async function updateWorkshopAction(id: string, formData: any) {
         is_published: formData.is_published !== false,
         highlights: formData.highlights || [],
         learning_outcomes: formData.learning_outcomes || [],
-        faq: formData.faq || []
+        faq: formData.faq || [],
+        project_preview_url: formData.project_preview_url || null,
+        project_preview_enabled: formData.project_preview_enabled === true
       })
       .eq('id', id);
 

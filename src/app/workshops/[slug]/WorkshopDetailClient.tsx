@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Rocket
 } from 'lucide-react';
 import Navbar from '@/components/Layout/Navbar';
 import Footer from '@/components/Layout/Footer';
@@ -184,6 +185,33 @@ export default function WorkshopDetailClient({
                 <p className="font-display font-bold text-deep-navy">{workshop.instructor}</p>
               </div>
             </NeoCard>
+
+            {/* Project Preview — "What you build by the end of Workshop" */}
+            {workshop.projectPreviewEnabled && workshop.projectPreviewUrl && (
+              <NeoCard variant="mint" borderSize="normal" className="p-6 md:p-8 text-left space-y-4">
+                <div className="inline-flex items-center gap-1.5 border-2 border-deep-navy bg-white px-3 py-1 rounded-full font-display font-bold text-xs shadow-[2px_2px_0px_0px_#1B1F3B] uppercase">
+                  <Rocket className="w-3.5 h-3.5 text-deep-navy" />
+                  <span>Project Preview</span>
+                </div>
+                <h2 className="font-display font-black text-2xl md:text-3xl text-deep-navy leading-none">
+                  What you build by the end of Workshop
+                </h2>
+                <p className="font-sans font-semibold text-sm md:text-base text-deep-navy/80">
+                  Take a live look at the finished project you&apos;ll walk away with — explore the
+                  real, deployed result before you register.
+                </p>
+                <NeoButton
+                  variant="orange"
+                  size="md"
+                  onClick={() =>
+                    window.open(workshop.projectPreviewUrl, '_blank', 'noopener,noreferrer')
+                  }
+                >
+                  What you build by the end of Workshop
+                  <ExternalLink size={16} className="ml-1.5" />
+                </NeoButton>
+              </NeoCard>
+            )}
 
             {/* Learning Outcomes */}
             {workshop.learningOutcomes.length > 0 && (

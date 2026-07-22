@@ -198,6 +198,18 @@ export default function WorkshopsCatalog({
                       hoverEffect={true}
                       className="p-6 flex flex-col justify-between items-start gap-5 border-3 h-full"
                     >
+                      {/* Thumbnail — only shown when a cover image is set */}
+                      {shop.coverImage && (
+                        <div className="w-full h-40 border-2 border-deep-navy rounded-xl overflow-hidden shadow-neo-inset">
+                          <img
+                            src={shop.coverImage}
+                            alt={`${shop.title} thumbnail`}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+
                       {/* Top Row */}
                       <div className="w-full flex items-center justify-between">
                         <span className={`px-2.5 py-0.5 border-2 border-deep-navy bg-${themeColor} rounded-lg font-display font-black text-xs uppercase text-deep-navy`}>

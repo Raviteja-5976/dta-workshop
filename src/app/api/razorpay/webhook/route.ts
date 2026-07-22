@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { sendRegistrationConfirmedEmail } from '@/lib/email/notifications';
 
 /**
  * Handles Webhook events from Razorpay.
@@ -142,6 +143,9 @@ export async function POST(request: NextRequest) {
         console.error('Failed to update registration status:', regError);
         return NextResponse.json({ error: 'Database registration update failed' }, { status: 500 });
       }
+
+      // Send the payment-confirmation email (idempotent; best-effort).
+      await sendRegistrationConfirmedEmail(registrationId);
 
       console.log(`Successfully confirmed registration ${registrationId} via Razorpay webhook.`);
     }

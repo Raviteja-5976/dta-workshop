@@ -9,10 +9,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Terminal, CheckCircle2, Lock, Mail, User, Info, ArrowLeft } from 'lucide-react';
+import { FcGoogle } from 'react-icons/fc';
+import { FaGithub } from 'react-icons/fa';
 import { NeoButton } from '@/components/UI/NeoButton';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { supabase, isMock } from '@/lib/supabase';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { sendWelcomeEmailAction } from '@/actions/email';
 
 // Form Validation Schemas
 const loginSchema = z.object({
@@ -42,6 +45,7 @@ function AuthPageContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/dashboard';
@@ -53,6 +57,42 @@ function AuthPageContent() {
       router.push(redirectTo);
     }
   }, [user, router, redirectTo]);
+
+  // Surface any error handed back by the OAuth callback (?error=...).
+  useEffect(() => {
+    const err = searchParams?.get('error');
+    if (err) setErrorMsg(err);
+  }, [searchParams]);
+
+  // Kick off a Google / GitHub OAuth login. Supabase redirects the browser to
+  // the provider and back to /auth/callback, which finalizes the session.
+  const handleOAuth = async (provider: 'google' | 'github') => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (isMock) {
+      setErrorMsg('Social login needs live Supabase keys — it is disabled in simulated mode.');
+      return;
+    }
+
+    setOauthLoading(provider);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+        },
+      });
+      if (error) {
+        setErrorMsg(error.message);
+        setOauthLoading(null);
+      }
+      // On success the browser is redirected to the provider — nothing more here.
+    } catch {
+      setErrorMsg('Could not start social login. Please try again.');
+      setOauthLoading(null);
+    }
+  };
 
   // Form Hooks
   const {
@@ -122,6 +162,9 @@ function AuthPageContent() {
       } else if (authData.session) {
         // Email confirmation is OFF — user is signed in immediately.
         setUser(authData.session.user);
+        // Fire the welcome email (server resolves the user from the session
+        // cookie + dedupes). Fire-and-forget so it never blocks the redirect.
+        sendWelcomeEmailAction().catch(() => {});
         setSuccessMsg('Account created successfully! Redirecting...');
         setTimeout(() => {
           router.push(redirectTo);
@@ -430,17 +473,21 @@ function AuthPageContent() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                disabled
-                className="py-3 border-3 border-deep-navy bg-bg-cream rounded-xl text-deep-navy/40 font-display font-extrabold flex items-center justify-center gap-2 cursor-not-allowed opacity-50 shadow-neo-inset"
+                onClick={() => handleOAuth('google')}
+                disabled={oauthLoading !== null}
+                className="py-3 border-3 border-deep-navy bg-white rounded-xl text-deep-navy font-display font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_0px_#1B1F3B] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#1B1F3B] active:translate-y-0 active:shadow-[2px_2px_0px_0px_#1B1F3B] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Google
+                <FcGoogle className="w-5 h-5" />
+                {oauthLoading === 'google' ? 'Redirecting...' : 'Google'}
               </button>
               <button
                 type="button"
-                disabled
-                className="py-3 border-3 border-deep-navy bg-bg-cream rounded-xl text-deep-navy/40 font-display font-extrabold flex items-center justify-center gap-2 cursor-not-allowed opacity-50 shadow-neo-inset"
+                onClick={() => handleOAuth('github')}
+                disabled={oauthLoading !== null}
+                className="py-3 border-3 border-deep-navy bg-white rounded-xl text-deep-navy font-display font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_0px_#1B1F3B] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#1B1F3B] active:translate-y-0 active:shadow-[2px_2px_0px_0px_#1B1F3B] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                GitHub
+                <FaGithub className="w-5 h-5" />
+                {oauthLoading === 'github' ? 'Redirecting...' : 'GitHub'}
               </button>
             </div>
           </NeoCard>

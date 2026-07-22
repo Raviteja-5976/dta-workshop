@@ -66,15 +66,29 @@ export const LatestWorkshops = ({ workshops = workshopsData }: { workshops?: Wor
                     </span>
                   </div>
 
-                  {/* Thumbnail Mockup */}
-                  <div className="w-full h-36 border-2 border-deep-navy rounded-2xl bg-bg-cream flex flex-col justify-between p-4 relative overflow-hidden bg-grid-pattern shadow-neo-inset">
-                    <div className="w-6 h-6 rounded-full bg-white border border-deep-navy flex items-center justify-center font-display font-black text-[10px]">
-                      {i + 1}
+                  {/* Thumbnail — real cover image when available, mockup otherwise */}
+                  {shop.coverImage ? (
+                    <div className="w-full h-36 border-2 border-deep-navy rounded-2xl overflow-hidden relative shadow-neo-inset">
+                      <img
+                        src={shop.coverImage}
+                        alt={`${shop.title} thumbnail`}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute top-2 left-2 w-6 h-6 rounded-full bg-white border border-deep-navy flex items-center justify-center font-display font-black text-[10px] text-deep-navy">
+                        {i + 1}
+                      </span>
                     </div>
-                    <span className="font-display font-black text-xl text-deep-navy/30 select-none block text-right rotate-[-4deg]">
-                      {shop.slug.toUpperCase()}
-                    </span>
-                  </div>
+                  ) : (
+                    <div className="w-full h-36 border-2 border-deep-navy rounded-2xl bg-bg-cream flex flex-col justify-between p-4 relative overflow-hidden bg-grid-pattern shadow-neo-inset">
+                      <div className="w-6 h-6 rounded-full bg-white border border-deep-navy flex items-center justify-center font-display font-black text-[10px]">
+                        {i + 1}
+                      </div>
+                      <span className="font-display font-black text-xl text-deep-navy/30 select-none block text-right rotate-[-4deg]">
+                        {shop.slug.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Title & Short Desc */}
                   <div className="space-y-2">

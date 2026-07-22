@@ -27,7 +27,9 @@ export default async function SessionsPage({ params }: SessionsPageProps) {
       scheduled_at: null,
       topics: s.topics,
       assignment: s.assignment,
-      resources: s.resources || []
+      resources: s.resources || [],
+      meeting_link: '',
+      is_live: false
     }));
   } else {
     try {
@@ -68,7 +70,9 @@ export default async function SessionsPage({ params }: SessionsPageProps) {
           scheduled_at: s.scheduled_at,
           topics: Array.isArray(s.topics) ? s.topics : [],
           assignment: s.assignment || '',
-          resources: Array.isArray(s.resources) ? s.resources : []
+          resources: Array.isArray(s.resources) ? s.resources : [],
+          meeting_link: s.meeting_link || '',
+          is_live: s.is_live === true
         }));
       }
 

@@ -8,18 +8,19 @@ import {
   ArrowUp, 
   ArrowDown, 
   Save, 
-  Clock, 
+  Clock,
   Calendar,
   Layers,
   BookOpen,
-  Info
+  Info,
+  Video
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NeoButton } from '@/components/UI/NeoButton';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { TagInput } from '@/components/UI/TagInput';
-import { saveSessionsAction } from '@/actions/sessions';
+import { saveSessionsAction, updateSessionLiveAction } from '@/actions/sessions';
 
 interface SessionItem {
   id?: string;
@@ -30,6 +31,8 @@ interface SessionItem {
   topics: string[];
   assignment: string;
   resources: string[];
+  meeting_link: string;
+  is_live: boolean;
 }
 
 interface SessionEditorClientProps {
@@ -52,6 +55,7 @@ export const SessionEditorClient: React.FC<SessionEditorClientProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [liveBusy, setLiveBusy] = useState<number | null>(null);
 
   const addSession = () => {
     setSessions([
@@ -64,8 +68,42 @@ export const SessionEditorClient: React.FC<SessionEditorClientProps> = ({
         topics: [],
         assignment: '',
         resources: [],
+        meeting_link: '',
+        is_live: false,
       }
     ]);
+  };
+
+  // Flip a session live/offline. Turning it on opens the meeting link (the
+  // instructor joins) and — for an already-saved session — persists instantly so
+  // students see the Join button right away. New unsaved sessions persist on Save.
+  const toggleLive = async (idx: number) => {
+    const session = sessions[idx];
+    const next = !session.is_live;
+
+    if (next && !session.meeting_link.trim()) {
+      setErrorMsg('Add a meeting link for this session before switching it live.');
+      return;
+    }
+
+    setErrorMsg(null);
+    updateSession(idx, 'is_live', next);
+
+    if (next && session.meeting_link) {
+      window.open(session.meeting_link, '_blank', 'noopener,noreferrer');
+    }
+
+    if (session.id) {
+      setLiveBusy(idx);
+      const res = await updateSessionLiveAction(session.id, next, session.meeting_link);
+      setLiveBusy(null);
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to update live status.');
+        updateSession(idx, 'is_live', !next); // revert on failure
+      } else {
+        router.refresh();
+      }
+    }
   };
 
   const removeSession = (idx: number) => {
@@ -220,6 +258,35 @@ export const SessionEditorClient: React.FC<SessionEditorClientProps> = ({
 
               {/* Form content */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Live meeting control */}
+                <div className={`space-y-2.5 md:col-span-2 border-2 rounded-xl p-4 transition-colors ${session.is_live ? 'border-success bg-mint/10' : 'border-deep-navy/15 bg-bg-cream/30'}`}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <label className="text-[10px] font-display font-black uppercase text-deep-navy flex items-center gap-1">
+                      <Video size={12} className="text-deep-navy/50" /> Live Meeting Link
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => toggleLive(idx)}
+                      disabled={liveBusy === idx}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-deep-navy rounded-lg font-display font-black text-[10px] uppercase shadow-[2px_2px_0px_0px_#1B1F3B] hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none ${session.is_live ? 'bg-success text-white' : 'bg-white text-deep-navy'}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${session.is_live ? 'bg-white animate-pulse' : 'bg-deep-navy/30'}`} />
+                      {liveBusy === idx ? 'Saving...' : session.is_live ? 'Live Now — End Session' : 'Go Live'}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={session.meeting_link}
+                    onChange={(e) => updateSession(idx, 'meeting_link', e.target.value)}
+                    placeholder="https://meet.google.com/... or a Zoom / Teams link"
+                    className="w-full border-2 border-deep-navy rounded-lg bg-white font-semibold px-3 py-2 text-xs focus:outline-none"
+                  />
+                  <p className="text-[10px] font-bold text-deep-navy/50 leading-relaxed">
+                    Only confirmed students see this — inside their dashboard. Switching it live opens the link
+                    and reveals the Join button for them. Remember to <span className="font-black text-deep-navy">Save Schedule</span> after editing the link.
+                  </p>
+                </div>
+
                 {/* About this session */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[10px] font-display font-black uppercase text-deep-navy flex items-center gap-1">

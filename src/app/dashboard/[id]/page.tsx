@@ -69,8 +69,8 @@ export default function RegistrationDetailPage() {
           };
           setReg(mockReg);
           setSessions([
-            { id: '1', title: 'IDE Setup & Prompting Patterns', session_order: 1, duration_label: '2 Hours', topics: ['Cursor Rules', 'v0 Dev'], assignment: 'Submit GitHub repository link.', resources: ['Rules Template'] },
-            { id: '2', title: 'Deploying & SEO Basics', session_order: 2, duration_label: '2 Hours', topics: ['Vercel DNS', 'Meta Tags'], assignment: 'Submit live deployment link.', resources: ['SEO Guide'] },
+            { id: '1', title: 'IDE Setup & Prompting Patterns', session_order: 1, duration_label: '2 Hours', topics: ['Cursor Rules', 'v0 Dev'], assignment: 'Submit GitHub repository link.', resources: ['Rules Template'], is_live: true, meeting_link: 'https://meet.google.com/demo-live-session' },
+            { id: '2', title: 'Deploying & SEO Basics', session_order: 2, duration_label: '2 Hours', topics: ['Vercel DNS', 'Meta Tags'], assignment: 'Submit live deployment link.', resources: ['SEO Guide'], is_live: false, meeting_link: '' },
           ]);
           setLoadingData(false);
           return;
@@ -385,9 +385,24 @@ export default function RegistrationDetailPage() {
                             </h4>
                           </div>
 
-                          <div className="pt-3 border-t border-dashed border-deep-navy/10 mt-3 flex items-center justify-between text-[10px] font-bold text-primary-orange">
-                            <span>Topics: {Array.isArray(sess.topics) ? sess.topics.slice(0, 2).join(', ') : 'TBA'}</span>
-                            <span className="text-deep-navy/40">Upcoming</span>
+                          <div className="pt-3 border-t border-dashed border-deep-navy/10 mt-3 space-y-2">
+                            <div className="flex items-center justify-between text-[10px] font-bold text-primary-orange">
+                              <span>Topics: {Array.isArray(sess.topics) ? sess.topics.slice(0, 2).join(', ') : 'TBA'}</span>
+                              {sess.is_live && sess.meeting_link ? (
+                                <span className="inline-flex items-center gap-1 text-success uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> Live
+                                </span>
+                              ) : (
+                                <span className="text-deep-navy/40">Upcoming</span>
+                              )}
+                            </div>
+                            {sess.is_live && sess.meeting_link && (
+                              <a href={sess.meeting_link} target="_blank" rel="noopener noreferrer" className="block">
+                                <span className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-deep-navy bg-success text-white rounded-lg font-display font-black text-[11px] uppercase shadow-[2px_2px_0px_0px_#1B1F3B] hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer">
+                                  <Video size={13} /> Join Live Session
+                                </span>
+                              </a>
+                            )}
                           </div>
                         </NeoCard>
                       ))}

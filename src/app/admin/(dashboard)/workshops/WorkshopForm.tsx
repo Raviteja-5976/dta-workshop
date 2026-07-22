@@ -13,24 +13,31 @@ import {
   BookOpen,
   HelpCircle,
   Award,
-  Sparkles
+  Sparkles,
+  Rocket,
+  Upload
 } from 'lucide-react';
 import Link from 'next/link';
 import { NeoButton } from '@/components/UI/NeoButton';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { TagInput } from '@/components/UI/TagInput';
-import { createWorkshopAction, updateWorkshopAction } from '@/actions/workshops';
+import { createWorkshopAction, updateWorkshopAction, uploadWorkshopCoverAction } from '@/actions/workshops';
+import { resolveCoverImage } from '@/lib/images';
 
 const workshopSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   slug: z.string().optional(),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   about_text: z.string().optional(),
-  cover_image: z.string().url('Must be a valid URL').or(z.literal('')),
+  // Holds the uploaded Storage object path (or a legacy URL). Resolved for
+  // display by resolveCoverImage() — not a raw URL the admin types anymore.
+  cover_image: z.string().optional(),
   difficulty: z.enum(['Beginner', 'Intermediate', 'Advanced']),
   category: z.enum(['Frontend', 'Backend', 'AI', 'Career', 'Dev Tools', 'Portfolio']),
   default_instructor_id: z.string().optional(),
   is_published: z.boolean(),
+  project_preview_url: z.string().url('Must be a valid URL').or(z.literal('')),
+  project_preview_enabled: z.boolean(),
 });
 
 type WorkshopFormValues = z.infer<typeof workshopSchema>;
@@ -84,6 +91,14 @@ export const WorkshopForm: React.FC<WorkshopFormProps> = ({
     toArray<{ q: string; a: string }>(initialData?.faq)
   );
 
+  // Cover image upload (stored in the Supabase bucket, previewed here and shown
+  // identically on the public/user pages via resolveCoverImage).
+  const [coverPreview, setCoverPreview] = useState<string | undefined>(
+    resolveCoverImage(initialData?.cover_image)
+  );
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -101,6 +116,8 @@ export const WorkshopForm: React.FC<WorkshopFormProps> = ({
       category: initialData?.category || 'Portfolio',
       default_instructor_id: initialData?.default_instructor_id || '',
       is_published: initialData?.is_published !== false,
+      project_preview_url: initialData?.project_preview_url || '',
+      project_preview_enabled: initialData?.project_preview_enabled === true,
     },
   });
 
@@ -132,6 +149,37 @@ export const WorkshopForm: React.FC<WorkshopFormProps> = ({
 
   const removeFaq = (idx: number) => {
     setFaq(faq.filter((_, i) => i !== idx));
+  };
+
+  // Upload the chosen file to the storage bucket, then store its path in the form.
+  const handleCoverSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverError(null);
+
+    const localUrl = URL.createObjectURL(file);
+    setCoverPreview(localUrl);          // instant local preview while uploading
+    setUploadingCover(true);
+
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await uploadWorkshopCoverAction(fd);
+      if (res.success && res.path) {
+        setValue('cover_image', res.path, { shouldDirty: true });
+        setCoverPreview(resolveCoverImage(res.path));
+      } else {
+        setCoverError(res.error || 'Upload failed.');
+        setCoverPreview(resolveCoverImage(initialData?.cover_image));
+      }
+    } catch {
+      setCoverError('Upload failed. Please try again.');
+      setCoverPreview(resolveCoverImage(initialData?.cover_image));
+    } finally {
+      setUploadingCover(false);
+      URL.revokeObjectURL(localUrl);
+      e.target.value = '';              // allow re-selecting the same file
+    }
   };
 
   const onSubmit = async (values: WorkshopFormValues) => {
@@ -286,16 +334,42 @@ export const WorkshopForm: React.FC<WorkshopFormProps> = ({
               </select>
             </div>
 
-            {/* Cover Image URL */}
-            <div className="space-y-2">
-              <label className="font-display font-black text-xs uppercase text-deep-navy">Cover Image URL</label>
-              <input
-                type="text"
-                placeholder="https://example.com/cover.jpg"
-                className="w-full border-3 border-deep-navy rounded-xl bg-bg-cream font-semibold px-4 py-3 shadow-neo-inset focus:bg-white focus:outline-none text-deep-navy"
-                {...register('cover_image')}
-              />
-              {errors.cover_image && <p className="text-coral font-bold text-xs">{errors.cover_image.message}</p>}
+            {/* Cover Image Upload */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="font-display font-black text-xs uppercase text-deep-navy">Cover Image</label>
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                {/* Live preview */}
+                <div className="w-full sm:w-48 h-32 shrink-0 border-3 border-deep-navy rounded-xl overflow-hidden bg-bg-cream shadow-neo-inset flex items-center justify-center">
+                  {coverPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] font-bold text-deep-navy/40 uppercase text-center px-2">No image yet</span>
+                  )}
+                </div>
+
+                {/* Upload control */}
+                <div className="flex-1 space-y-2">
+                  <label className={`inline-flex items-center gap-2 px-4 py-2.5 border-3 border-deep-navy bg-yellow rounded-xl font-display font-black text-xs uppercase text-deep-navy shadow-[2px_2px_0px_0px_#1B1F3B] transition-all w-fit ${uploadingCover ? 'opacity-60 cursor-wait' : 'hover:-translate-y-0.5 active:translate-y-0 cursor-pointer'}`}>
+                    <Upload size={14} />
+                    {uploadingCover ? 'Uploading...' : coverPreview ? 'Replace Image' : 'Upload Image'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoverSelect}
+                      disabled={uploadingCover}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-[10px] font-bold text-deep-navy/50 leading-relaxed">
+                    Stored in your Supabase storage bucket and shown as the thumbnail on the catalog,
+                    home page and workshop page. PNG / JPG / WEBP, up to 5MB.
+                  </p>
+                  {coverError && <p className="text-coral font-bold text-xs">{coverError}</p>}
+                </div>
+              </div>
+              {/* Holds the uploaded object path submitted with the form. */}
+              <input type="hidden" {...register('cover_image')} />
             </div>
           </div>
 
@@ -333,6 +407,46 @@ export const WorkshopForm: React.FC<WorkshopFormProps> = ({
             <label htmlFor="is_published" className="font-display font-black text-sm uppercase text-deep-navy cursor-pointer">
               Publish directly to the student portal catalog
             </label>
+          </div>
+        </NeoCard>
+
+        {/* Project Preview */}
+        <NeoCard variant="white" className="p-6 md:p-8 space-y-6">
+          <div className="flex items-center gap-2 border-b-2 border-deep-navy/10 pb-3 mb-2">
+            <Rocket className="w-5 h-5 text-deep-navy" />
+            <h3 className="font-display font-black text-lg uppercase">Project Preview</h3>
+          </div>
+
+          <p className="text-xs text-deep-navy/60 font-semibold">
+            Link to a live preview of the project students build by the end of this
+            workshop. When enabled, the public workshop page shows a
+            <span className="font-black text-deep-navy"> &ldquo;What you build by the end of Workshop&rdquo; </span>
+            button that opens this link.
+          </p>
+
+          {/* Enable toggle */}
+          <div className="flex items-center gap-3 bg-bg-cream/40 border-2 border-dashed border-deep-navy/20 rounded-xl p-4">
+            <input
+              type="checkbox"
+              id="project_preview_enabled"
+              className="w-5 h-5 accent-mint cursor-pointer"
+              {...register('project_preview_enabled')}
+            />
+            <label htmlFor="project_preview_enabled" className="font-display font-black text-sm uppercase text-deep-navy cursor-pointer">
+              Show project preview on the workshop page
+            </label>
+          </div>
+
+          {/* Preview URL */}
+          <div className="space-y-2">
+            <label className="font-display font-black text-xs uppercase text-deep-navy">Project Preview Link</label>
+            <input
+              type="text"
+              placeholder="https://your-live-project-demo.com"
+              className="w-full border-3 border-deep-navy rounded-xl bg-bg-cream font-semibold px-4 py-3 shadow-neo-inset focus:bg-white focus:outline-none text-deep-navy"
+              {...register('project_preview_url')}
+            />
+            {errors.project_preview_url && <p className="text-coral font-bold text-xs">{errors.project_preview_url.message}</p>}
           </div>
         </NeoCard>
 

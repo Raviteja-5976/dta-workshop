@@ -28,7 +28,9 @@ export default async function EditWorkshopPage({ params }: EditWorkshopPageProps
       highlights: staticWs.highlights,
       learning_outcomes: staticWs.learningOutcomes,
       faq: staticWs.faq,
-      is_published: true
+      is_published: true,
+      project_preview_url: staticWs.projectPreviewUrl || '',
+      project_preview_enabled: staticWs.projectPreviewEnabled === true
     };
   } else {
     try {

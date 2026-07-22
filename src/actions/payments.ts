@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createRazorpayPaymentLink } from '@/lib/razorpay';
 import { revalidatePath } from 'next/cache';
 import { isMock } from '@/lib/supabase/config';
+import { sendRegistrationConfirmedEmail } from '@/lib/email/notifications';
 
 /**
  * Generates a Razorpay Payment Link for a student registration.
@@ -201,6 +202,9 @@ export async function mockProcessPaymentAction(registrationId: string, batchId: 
 
     if (regError) throw regError;
 
+    // Confirmation email (idempotent; best-effort).
+    await sendRegistrationConfirmedEmail(registrationId);
+
     revalidatePath('/admin/payments');
     revalidatePath('/admin/registrations');
     revalidatePath(`/admin/batches/${batchId}/registrations`);
@@ -391,6 +395,9 @@ export async function processStudentMockPaymentAction(registrationId: string) {
       .eq('id', registrationId);
 
     if (regUpdateError) throw regUpdateError;
+
+    // Confirmation email (idempotent; best-effort).
+    await sendRegistrationConfirmedEmail(registrationId);
 
     return { success: true };
   } catch (error: any) {

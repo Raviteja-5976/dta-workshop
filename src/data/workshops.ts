@@ -43,6 +43,9 @@ export interface Workshop {
   faq: FAQItem[];
   learningOutcomes: LearningOutcome[];
   aboutText?: string;
+  // Optional "What you build by the end of Workshop" project preview.
+  projectPreviewUrl?: string;
+  projectPreviewEnabled?: boolean;
 }
 
 export const workshopsData: Workshop[] = [
