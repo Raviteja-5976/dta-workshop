@@ -3,6 +3,7 @@ import { Space_Grotesk, Inter, Alex_Brush } from "next/font/google";
 import "./globals.css";
 import LenisProvider from "@/components/providers/LenisProvider";
 import AuthProvider from "@/components/providers/AuthProvider";
+import GoogleAnalytics from "@/components/Analytics/GoogleAnalytics";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -38,6 +39,7 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${inter.variable} ${alexBrush.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-bg-cream text-deep-navy font-sans select-none">
+        <GoogleAnalytics />
         <AuthProvider>
           <LenisProvider>
             {children}
