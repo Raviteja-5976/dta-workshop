@@ -1,16 +1,26 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Rss } from 'lucide-react';
+import { Check, Mail } from 'lucide-react';
 import { FaDiscord, FaXTwitter, FaInstagram, FaLinkedin, FaReddit } from 'react-icons/fa6';
-import { NeoButton } from '@/components/UI/NeoButton';
+import { InfoModal } from '@/components/UI/InfoModal';
+import { useLegalModal } from '@/lib/store/useLegalModal';
 
 export const Footer = () => {
+  const openLegal = useLegalModal((s) => s.open);
+  const [infoModal, setInfoModal] = useState<'mentors' | 'careers' | null>(null);
+
+  const mentorPoints = [
+    'Hands-on builders who have designed, coded, and shipped real products to production.',
+    'They understand the pain points that surface mid-build — the tricky bugs, the scaling walls, and the "why won\'t this work" moments.',
+    'They know how to handle them: debugging live, unblocking you fast, and sharing the battle-tested workarounds that only come from experience.',
+  ];
+
   return (
     <footer className="border-t-4 border-deep-navy bg-white text-deep-navy py-12 md:py-20 bg-grid-pattern">
-      <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {/* Brand Column */}
         <div className="lg:col-span-2 space-y-6">
           <Link href="/" className="flex items-center gap-3 group focus:outline-none">
@@ -82,46 +92,99 @@ export const Footer = () => {
               </a>
             </li>
             <li>
-              <a href="#" className="hover:text-primary-orange transition-colors">
+              <button
+                type="button"
+                onClick={() => setInfoModal('mentors')}
+                className="hover:text-primary-orange transition-colors cursor-pointer"
+              >
                 Mentors
-              </a>
+              </button>
             </li>
             <li>
-              <a href="#" className="hover:text-primary-orange transition-colors">
+              <button
+                type="button"
+                onClick={() => setInfoModal('careers')}
+                className="hover:text-primary-orange transition-colors cursor-pointer"
+              >
                 Careers
-              </a>
+              </button>
             </li>
           </ul>
-        </div>
-
-        {/* Newsletter Column */}
-        <div className="space-y-4">
-          <h4 className="font-display font-bold text-xl border-b-2 border-deep-navy pb-1">Newsletter</h4>
-          <p className="font-semibold text-deep-navy/80">Stay updated with upcoming batches and new workshops.</p>
-          <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
-            <input
-              type="email"
-              placeholder="vibe-coder@dta.com"
-              className="px-4 py-3 border-3 border-deep-navy rounded-xl bg-bg-cream text-deep-navy placeholder-deep-navy/40 font-semibold focus:outline-none focus:bg-white shadow-neo-inset"
-            />
-            <NeoButton variant="orange" size="sm" type="submit">
-              Subscribe
-            </NeoButton>
-          </form>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 mt-16 pt-8 border-t-3 border-deep-navy flex flex-col md:flex-row items-center justify-between gap-4 font-bold">
         <span>© {new Date().getFullYear()} Workshop.DevTrackAcademy. All rights reserved.</span>
         <div className="flex gap-6">
-          <a href="#" className="hover:underline">
+          <button
+            type="button"
+            onClick={() => openLegal('privacy')}
+            className="hover:underline cursor-pointer"
+          >
             Privacy Policy
-          </a>
-          <a href="#" className="hover:underline">
+          </button>
+          <button
+            type="button"
+            onClick={() => openLegal('terms')}
+            className="hover:underline cursor-pointer"
+          >
             Terms of Service
-          </a>
+          </button>
         </div>
       </div>
+
+      {/* Mentors / Careers popups */}
+      <InfoModal
+        open={infoModal !== null}
+        onClose={() => setInfoModal(null)}
+        title={infoModal === 'careers' ? 'Careers' : 'Mentors'}
+      >
+        {infoModal === 'mentors' && (
+          <div className="space-y-5">
+            <h3 className="font-display font-black text-2xl md:text-3xl text-deep-navy leading-tight">
+              Mentors who have built the real thing
+            </h3>
+            <p className="leading-relaxed text-deep-navy/80 font-medium">
+              Every DevTrack Academy mentor has spent years designing, coding, and shipping
+              production-grade projects that real users depend on — not just teaching from slides.
+            </p>
+            <ul className="space-y-3">
+              {mentorPoints.map((text, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 border-deep-navy bg-mint shadow-[1.5px_1.5px_0_0_#1B1F3B]">
+                    <Check className="h-3.5 w-3.5 text-deep-navy" />
+                  </span>
+                  <span className="leading-relaxed text-deep-navy/80 font-medium">{text}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="leading-relaxed text-deep-navy/80 font-medium">
+              {"So when you get stuck, you're guided by someone who has been exactly where you are — and knows the way out."}
+            </p>
+          </div>
+        )}
+
+        {infoModal === 'careers' && (
+          <div className="space-y-5">
+            <h3 className="font-display font-black text-2xl md:text-3xl text-deep-navy leading-tight">
+              {"We're hiring — Marketing Personnel"}
+            </h3>
+            <p className="leading-relaxed text-deep-navy/80 font-medium">
+              {"DevTrack Academy is growing, and we're hiring marketing personnel to help us reach more developers and grow the platform. If you love community, content, and getting the word out, we'd love to hear from you."}
+            </p>
+            <p className="leading-relaxed text-deep-navy/80 font-medium">
+              {"Think you're a fit and want to get hired? Reach out to our founder:"}
+            </p>
+            <a
+              href="mailto:founder@devtrackacademy.com"
+              className="inline-flex items-center gap-2 font-display font-extrabold uppercase tracking-wide text-white border-3 border-deep-navy bg-primary-orange px-5 py-3 rounded-xl shadow-[3px_3px_0px_0px_#1B1F3B] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#1B1F3B] active:translate-y-0 active:shadow-[3px_3px_0px_0px_#1B1F3B] transition-all break-all"
+            >
+              <Mail className="h-5 w-5 shrink-0" />
+              founder@devtrackacademy.com
+            </a>
+          </div>
+        )}
+      </InfoModal>
     </footer>
   );
 };

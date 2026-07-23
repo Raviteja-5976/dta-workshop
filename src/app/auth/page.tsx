@@ -15,6 +15,7 @@ import { NeoButton } from '@/components/UI/NeoButton';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { supabase, isMock } from '@/lib/supabase';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { useLegalModal } from '@/lib/store/useLegalModal';
 import { sendWelcomeEmailAction } from '@/actions/email';
 
 // Form Validation Schemas
@@ -50,6 +51,7 @@ function AuthPageContent() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/dashboard';
   const { setUser, user } = useAuthStore();
+  const openLegal = useLegalModal((s) => s.open);
 
   // If already logged in, redirect to target page
   useEffect(() => {
@@ -449,7 +451,25 @@ function AuthPageContent() {
                         {...signupRegister('acceptTerms')}
                         className="w-4.5 h-4.5 accent-primary-orange border-2 border-deep-navy rounded mt-0.5 shrink-0"
                       />
-                      <span>I agree to accept terms, conditions, and capping rules.</span>
+                      <span>
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={() => openLegal('terms')}
+                          className="text-primary-orange underline hover:text-deep-navy cursor-pointer"
+                        >
+                          Terms of Service
+                        </button>
+                        {' '}and{' '}
+                        <button
+                          type="button"
+                          onClick={() => openLegal('privacy')}
+                          className="text-primary-orange underline hover:text-deep-navy cursor-pointer"
+                        >
+                          Privacy Policy
+                        </button>
+                        .
+                      </span>
                     </label>
                     {signupErrors.acceptTerms && (
                       <p className="text-coral font-bold text-xs mt-1">{signupErrors.acceptTerms.message}</p>

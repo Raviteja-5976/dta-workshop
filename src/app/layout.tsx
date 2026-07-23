@@ -4,6 +4,7 @@ import "./globals.css";
 import LenisProvider from "@/components/providers/LenisProvider";
 import AuthProvider from "@/components/providers/AuthProvider";
 import GoogleAnalytics from "@/components/Analytics/GoogleAnalytics";
+import LegalModal from "@/components/Legal/LegalModal";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -44,6 +45,7 @@ export default function RootLayout({
           <LenisProvider>
             {children}
           </LenisProvider>
+          <LegalModal />
         </AuthProvider>
       </body>
     </html>
