@@ -35,6 +35,7 @@ export async function createBatchAction(formData: any) {
         original_price: formData.original_price ? Number(formData.original_price) : null,
         seat_limit: Number(formData.seat_limit || 50),
         registration_open: formData.registration_open !== false,
+        registration_deadline: formData.registration_deadline || null,
         payment_link: formData.payment_link || null,
       })
       .select('id')
@@ -81,6 +82,7 @@ export async function updateBatchAction(id: string, formData: any) {
         original_price: formData.original_price ? Number(formData.original_price) : null,
         seat_limit: Number(formData.seat_limit || 50),
         registration_open: formData.registration_open !== false,
+        registration_deadline: formData.registration_deadline || null,
         payment_link: formData.payment_link || null,
       })
       .eq('id', id);

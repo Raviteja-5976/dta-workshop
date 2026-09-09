@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Calendar, Brain, Users2, Sparkles, Filter, RefreshCw, ChevronRight } from 'lucide-react';
+import { Search, Calendar, Brain, Users2, Sparkles, Filter, RefreshCw, ChevronRight, Lock, Timer } from 'lucide-react';
 import Navbar from '@/components/Layout/Navbar';
 import Footer from '@/components/Layout/Footer';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { NeoButton } from '@/components/UI/NeoButton';
 import { Workshop } from '@/data/workshops';
+import { formatDeadline, isRegistrationClosed } from '@/lib/datetime';
 
 export default function WorkshopsCatalog({
   workshops,
@@ -21,6 +22,19 @@ export default function WorkshopsCatalog({
   const [selectedDifficulty, setSelectedDifficulty] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string[]>([]);
+  // Null until mounted so SSR markup matches the first client render; then it
+  // ticks so a card closes itself when its deadline passes.
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, []);
 
   // Unique categories, difficulties, statuses for reference
   const difficulties = ['Beginner', 'Intermediate', 'Advanced'];
@@ -188,6 +202,16 @@ export default function WorkshopsCatalog({
                   const colors = ['yellow', 'sky', 'mint', 'coral'];
                   const themeColor = colors[i % colors.length];
                   const regStatus = shop.batchId ? registeredBatches[shop.batchId] : undefined;
+                  const closed =
+                    now === null
+                      ? shop.registrationClosed ?? false
+                      : isRegistrationClosed(
+                          {
+                            registrationOpen: shop.registrationOpen,
+                            registrationDeadline: shop.registrationDeadline,
+                          },
+                          now
+                        );
 
                   return (
                     <NeoCard
@@ -215,12 +239,20 @@ export default function WorkshopsCatalog({
                         <span className={`px-2.5 py-0.5 border-2 border-deep-navy bg-${themeColor} rounded-lg font-display font-black text-xs uppercase text-deep-navy`}>
                           {shop.category}
                         </span>
-                        <span className={`px-2 py-0.5 border border-deep-navy rounded-md font-sans font-black text-[9px] uppercase ${
-                          shop.status === 'Live' ? 'bg-success text-white' :
-                          shop.status === 'Upcoming' ? 'bg-yellow text-deep-navy' : 'bg-deep-navy/10 text-deep-navy'
-                        }`}>
-                          {shop.status}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {closed && (
+                            <span className="px-2 py-0.5 border border-deep-navy rounded-md bg-coral text-white font-sans font-black text-[9px] uppercase inline-flex items-center gap-1">
+                              <Lock size={9} className="stroke-[3]" />
+                              Closed
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 border border-deep-navy rounded-md font-sans font-black text-[9px] uppercase ${
+                            shop.status === 'Live' ? 'bg-success text-white' :
+                            shop.status === 'Upcoming' ? 'bg-yellow text-deep-navy' : 'bg-deep-navy/10 text-deep-navy'
+                          }`}>
+                            {shop.status}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Header details */}
@@ -269,6 +301,26 @@ export default function WorkshopsCatalog({
                         </div>
                       </div>
 
+                      {/* Registration window */}
+                      {(shop.registrationDeadline || closed) && (
+                        <div
+                          className={`w-full flex items-center gap-1.5 border-2 border-deep-navy rounded-lg px-2.5 py-1.5 ${
+                            closed ? 'bg-coral/20' : 'bg-yellow/30'
+                          }`}
+                        >
+                          {closed ? (
+                            <Lock size={12} className="text-deep-navy stroke-[3] shrink-0" />
+                          ) : (
+                            <Timer size={12} className="text-deep-navy stroke-[3] shrink-0" />
+                          )}
+                          <span className="font-sans font-bold text-[10px] uppercase text-deep-navy">
+                            {closed
+                              ? 'Registration closed'
+                              : `Registration closes ${formatDeadline(shop.registrationDeadline)}`}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Instructor block */}
                       <div className="w-full flex items-center justify-between text-[10px] font-bold text-deep-navy/60">
                         <span>Instructor: {shop.instructor}</span>
@@ -287,12 +339,12 @@ export default function WorkshopsCatalog({
                           </NeoButton>
                         ) : (
                           <NeoButton
-                            variant={shop.status === 'Completed' ? 'white' : 'orange'}
+                            variant={shop.status === 'Completed' || closed ? 'white' : 'orange'}
                             size="sm"
-                            disabled={shop.status === 'Completed'}
+                            disabled={shop.status === 'Completed' || closed}
                             onClick={() => router.push(`/workshops/${shop.slug}`)}
                           >
-                            Register
+                            {closed ? 'Closed' : 'Register'}
                           </NeoButton>
                         )}
                         <NeoButton

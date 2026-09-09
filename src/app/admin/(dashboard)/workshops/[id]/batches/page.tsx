@@ -33,6 +33,7 @@ export default async function BatchesPage({ params }: BatchesPageProps) {
         seats_taken: staticWs.seatLimit - staticWs.remainingSeats,
         seats_remaining: staticWs.remainingSeats,
         registration_open: true,
+        registration_deadline: null,
         payment_link: null,
         instructor_id: 'mock-inst-1',
         instructor_name: staticWs.instructor
@@ -78,6 +79,7 @@ export default async function BatchesPage({ params }: BatchesPageProps) {
           original_price,
           seat_limit,
           registration_open,
+          registration_deadline,
           payment_link,
           instructor_id,
           profiles:instructor_id ( full_name )
@@ -112,6 +114,7 @@ export default async function BatchesPage({ params }: BatchesPageProps) {
             seats_taken: seatCount?.seats_taken || 0,
             seats_remaining: seatCount?.seats_remaining ?? b.seat_limit,
             registration_open: b.registration_open,
+            registration_deadline: b.registration_deadline,
             payment_link: b.payment_link,
             instructor_id: b.instructor_id,
             instructor_name: b.profiles?.full_name || 'DTA Team'

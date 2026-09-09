@@ -14,7 +14,9 @@ import {
   ArrowLeft,
   ChevronRight,
   ExternalLink,
-  Rocket
+  Rocket,
+  Lock,
+  Timer
 } from 'lucide-react';
 import Navbar from '@/components/Layout/Navbar';
 import Footer from '@/components/Layout/Footer';
@@ -25,7 +27,12 @@ import { Workshop } from '@/data/workshops';
 import { Certificate } from '@/components/UI/Certificate';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { registerStudentAction } from '@/actions/payments';
-import { useState } from 'react';
+import {
+  formatDeadline,
+  formatTimeLeft,
+  isRegistrationClosed,
+} from '@/lib/datetime';
+import { useEffect, useState } from 'react';
 
 export default function WorkshopDetailClient({
   workshop,
@@ -44,6 +51,27 @@ export default function WorkshopDetailClient({
   const isRegistered = !!registrationStatus;
   const isConfirmed = registrationStatus === 'confirmed';
 
+  // Registration window. The server already evaluated it for the first paint;
+  // a timer re-checks so the CTA closes itself when the deadline passes while
+  // the page is open.
+  const deadline = workshop?.registrationDeadline ?? null;
+  const [closed, setClosed] = useState<boolean>(workshop?.registrationClosed ?? false);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const registrationOpen = workshop?.registrationOpen;
+    const tick = () => {
+      setClosed(isRegistrationClosed({ registrationOpen, registrationDeadline: deadline }));
+      setTimeLeft(formatTimeLeft(deadline));
+    };
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [deadline, workshop?.registrationOpen]);
+
   // Handle Share Click
   const handleShare = () => {
     if (typeof window !== 'undefined') {
@@ -53,6 +81,11 @@ export default function WorkshopDetailClient({
   };
 
   const handleRegister = async () => {
+    if (closed) {
+      alert('Registrations for this batch are closed.');
+      return;
+    }
+
     if (!user) {
       router.push(`/auth?redirect=/workshops/${slug}`);
       return;
@@ -163,6 +196,34 @@ export default function WorkshopDetailClient({
                 );
               })}
             </div>
+
+            {/* Registration window */}
+            {(deadline || closed) && (
+              <div
+                className={`mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-2 border-deep-navy rounded-xl px-4 py-3 ${
+                  closed ? 'bg-coral/20' : 'bg-yellow/30'
+                }`}
+              >
+                {closed ? (
+                  <Lock className="w-4 h-4 text-deep-navy stroke-[3]" />
+                ) : (
+                  <Timer className="w-4 h-4 text-deep-navy stroke-[3]" />
+                )}
+                <span className="font-display font-black text-xs md:text-sm uppercase text-deep-navy">
+                  {closed ? 'Registrations Closed' : 'Registration closes'}
+                </span>
+                {deadline && (
+                  <span className="font-sans font-bold text-xs md:text-sm text-deep-navy/80">
+                    {closed ? `Deadline was ${formatDeadline(deadline)}` : formatDeadline(deadline)}
+                  </span>
+                )}
+                {!closed && timeLeft && (
+                  <span className="sm:ml-auto px-2.5 py-0.5 border-2 border-deep-navy bg-white rounded-full font-display font-black text-[10px] uppercase text-deep-navy shadow-[2px_2px_0px_0px_#1B1F3B]">
+                    {timeLeft}
+                  </span>
+                )}
+              </div>
+            )}
           </NeoCard>
         </section>
 
@@ -396,8 +457,12 @@ export default function WorkshopDetailClient({
           <aside className="lg:col-span-4 sticky top-28 space-y-6 w-full hidden lg:block">
             <NeoCard variant="yellow" borderSize="thick" shadowSize="large" className="p-6 text-left space-y-6 rotate-1">
               <div className="space-y-2 border-b-2 border-deep-navy pb-4">
-                <span className="font-display font-black text-[10px] uppercase text-primary-orange bg-white px-2 py-0.5 border border-deep-navy rounded-full">
-                  Batch filling fast
+                <span
+                  className={`font-display font-black text-[10px] uppercase px-2 py-0.5 border border-deep-navy rounded-full ${
+                    closed ? 'text-white bg-coral' : 'text-primary-orange bg-white'
+                  }`}
+                >
+                  {closed ? 'Registrations closed' : 'Batch filling fast'}
                 </span>
                 <h3 className="font-display font-black text-2xl text-deep-navy leading-none pt-1">
                   Join {workshop.batchLabel || 'This Batch'}
@@ -417,6 +482,12 @@ export default function WorkshopDetailClient({
                 <p className="font-sans font-bold text-[10px] text-deep-navy/60 uppercase">
                   Seats remaining: {workshop.remainingSeats} / {workshop.seatLimit}
                 </p>
+                {deadline && !closed && (
+                  <p className="font-sans font-bold text-[10px] text-deep-navy/60 uppercase">
+                    Closes: {formatDeadline(deadline)}
+                    {timeLeft ? ` · ${timeLeft}` : ''}
+                  </p>
+                )}
               </div>
 
               {/* Inclusions list */}
@@ -448,6 +519,18 @@ export default function WorkshopDetailClient({
                       {isConfirmed ? 'Go to Dashboard' : 'Complete Payment'}
                       <ChevronRight size={14} className="ml-1" />
                     </NeoButton>
+                  </>
+                ) : closed ? (
+                  <>
+                    <div className="w-full border-3 border-deep-navy bg-coral rounded-xl px-4 py-2.5 text-center font-display font-black text-sm uppercase text-white shadow-[2px_2px_0px_0px_#1B1F3B] flex items-center justify-center gap-1.5">
+                      <Lock size={16} className="stroke-[3]" />
+                      Registration Closed
+                    </div>
+                    <p className="font-sans font-bold text-[10px] text-deep-navy/60 uppercase text-center">
+                      {deadline
+                        ? `The deadline passed on ${formatDeadline(deadline)}.`
+                        : 'This batch is no longer accepting registrations.'}
+                    </p>
                   </>
                 ) : (
                   <NeoButton
@@ -485,6 +568,11 @@ export default function WorkshopDetailClient({
             <NeoButton variant="mint" size="sm" onClick={() => router.push('/dashboard')}>
               {isConfirmed ? 'Registered ✓' : 'Payment Pending'} <ChevronRight size={12} className="ml-0.5" />
             </NeoButton>
+          ) : closed ? (
+            <span className="px-3 py-2 border-3 border-deep-navy bg-coral rounded-xl font-display font-black text-xs uppercase text-white inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#1B1F3B]">
+              <Lock size={12} className="stroke-[3]" />
+              Closed
+            </span>
           ) : (
             <NeoButton variant="orange" size="sm" onClick={handleRegister} disabled={registering}>
               {registering ? 'Registering...' : 'Register'} <ChevronRight size={12} className="ml-0.5" />

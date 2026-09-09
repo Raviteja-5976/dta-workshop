@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Calendar, 
   Layers, 
@@ -11,7 +11,9 @@ import {
   Plus, 
   AlertTriangle,
   Link as LinkIcon,
-  HelpCircle
+  HelpCircle,
+  Clock,
+  Lock
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -19,6 +21,13 @@ import { NeoButton } from '@/components/UI/NeoButton';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { StatusBadge } from '@/components/UI/StatusBadge';
 import { createBatchAction, updateBatchAction, deleteBatchAction } from '@/actions/batches';
+import {
+  formatDeadline,
+  isoToIstInput,
+  istInputToISO,
+  isRegistrationClosed,
+  WORKSHOP_TIME_ZONE_LABEL,
+} from '@/lib/datetime';
 
 interface BatchItem {
   id: string;
@@ -35,6 +44,7 @@ interface BatchItem {
   seats_taken: number;
   seats_remaining: number;
   registration_open: boolean;
+  registration_deadline: string | null;
   payment_link: string | null;
   instructor_id: string | null;
   instructor_name: string;
@@ -64,6 +74,22 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
   const [editingBatch, setEditingBatch] = useState<BatchItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Wall clock used to flag batches whose deadline has passed. Starts null so
+  // the server-rendered markup and the first client render match, then ticks
+  // so a card flips to "Closed" without a page reload.
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    // Read the clock from timer callbacks only — a synchronous setState in the
+    // effect body would cascade a second render on every mount.
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, []);
 
   // Form states
   const [batchLabel, setBatchLabel] = useState('');
@@ -78,6 +104,8 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
   const [seatLimit, setSeatLimit] = useState(50);
   const [instructorId, setInstructorId] = useState('');
   const [registrationOpen, setRegistrationOpen] = useState(true);
+  // IST wall-clock value bound to <input type="datetime-local">.
+  const [registrationDeadline, setRegistrationDeadline] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
 
   const openAddModal = () => {
@@ -94,6 +122,7 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
     setSeatLimit(50);
     setInstructorId('');
     setRegistrationOpen(true);
+    setRegistrationDeadline('');
     setPaymentLink('');
     setModalOpen(true);
   };
@@ -112,6 +141,7 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
     setSeatLimit(batch.seat_limit);
     setInstructorId(batch.instructor_id || '');
     setRegistrationOpen(batch.registration_open);
+    setRegistrationDeadline(isoToIstInput(batch.registration_deadline));
     setPaymentLink(batch.payment_link || '');
     setModalOpen(true);
   };
@@ -135,6 +165,7 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
       original_price: originalPrice ? Number(originalPrice) : null,
       seat_limit: seatLimit,
       registration_open: registrationOpen,
+      registration_deadline: istInputToISO(registrationDeadline),
       payment_link: paymentLink || null,
     };
 
@@ -212,6 +243,12 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {batches.map((batch) => {
             const seatsPct = Math.min(Math.round((batch.seats_taken / batch.seat_limit) * 100), 100);
+            const closed =
+              now !== null &&
+              isRegistrationClosed({
+                registrationOpen: batch.registration_open,
+                registrationDeadline: batch.registration_deadline,
+              }, now);
             return (
               <NeoCard key={batch.id} variant="white" borderSize="normal" shadowSize="normal" className="p-6 flex flex-col justify-between text-left">
                 <div className="space-y-4">
@@ -220,7 +257,14 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
                     <span className="font-display font-black text-lg text-deep-navy uppercase">
                       {batch.batch_label}
                     </span>
-                    <StatusBadge status={batch.status} />
+                    <div className="flex items-center gap-1.5">
+                      {closed && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 border-2 border-deep-navy bg-coral text-white rounded-lg font-display font-black text-[9px] uppercase shadow-[1.5px_1.5px_0_0_#1B1F3B]">
+                          <Lock size={10} className="stroke-[3]" /> Closed
+                        </span>
+                      )}
+                      <StatusBadge status={batch.status} />
+                    </div>
                   </div>
 
                   {/* Instructor & Date Details */}
@@ -236,6 +280,17 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
                     <div className="flex items-center gap-2">
                       <Users size={14} className="text-deep-navy/40" />
                       <span>Instructor: <span className="font-bold capitalize">{batch.instructor_name || 'DTA Team'}</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-deep-navy/40" />
+                      {batch.registration_deadline ? (
+                        <span>
+                          Registration closes:{' '}
+                          <span className="font-bold">{formatDeadline(batch.registration_deadline)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-deep-navy/50">No registration deadline</span>
+                      )}
                     </div>
                     {batch.payment_link && (
                       <div className="flex items-center gap-2 text-primary-orange font-bold">
@@ -459,6 +514,36 @@ export const BatchesListClient: React.FC<BatchesListClientProps> = ({
                       <option key={inst.id} value={inst.id}>{inst.name}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Registration Deadline */}
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[10px] font-display font-black uppercase text-deep-navy flex items-center gap-1">
+                    <Clock size={11} className="stroke-[3]" />
+                    Registration Deadline ({WORKSHOP_TIME_ZONE_LABEL}) — Optional
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="datetime-local"
+                      value={registrationDeadline}
+                      onChange={(e) => setRegistrationDeadline(e.target.value)}
+                      className="flex-1 border-2 border-deep-navy rounded-lg bg-bg-cream font-semibold px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
+                    />
+                    {registrationDeadline && (
+                      <button
+                        type="button"
+                        onClick={() => setRegistrationDeadline('')}
+                        className="px-2.5 py-1.5 border-2 border-deep-navy bg-white hover:bg-bg-cream rounded-lg text-[10px] font-bold text-deep-navy shadow-[2px_2px_0px_0px_#1B1F3B] cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-semibold text-deep-navy/50">
+                    {registrationDeadline
+                      ? `Students can no longer register after ${formatDeadline(istInputToISO(registrationDeadline))}.`
+                      : 'Leave empty to accept registrations until you flip the switch below.'}
+                  </p>
                 </div>
 
                 {/* Static Payment Link */}

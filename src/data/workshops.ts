@@ -37,6 +37,12 @@ export interface Workshop {
   status: 'Live' | 'Upcoming' | 'Completed';
   seatLimit: number;
   remainingSeats: number;
+  // Registration window of the primary batch.
+  registrationOpen?: boolean;
+  /** ISO instant after which new registrations are refused. */
+  registrationDeadline?: string | null;
+  /** Server-evaluated at render time so the first paint is already correct. */
+  registrationClosed?: boolean;
   instructor: string;
   highlights: string[];
   schedule: SessionDetails[];

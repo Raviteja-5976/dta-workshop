@@ -1,4 +1,5 @@
 import { isMock } from '@/lib/supabase/config';
+import { isRegistrationClosed } from '@/lib/datetime';
 import { resolveCoverImage } from '@/lib/images';
 import {
   workshopsData as staticWorkshops,
@@ -50,6 +51,8 @@ type BatchRow = {
   price: number | null;
   original_price: number | null;
   seat_limit: number | null;
+  registration_open: boolean | null;
+  registration_deadline: string | null;
   batch_sessions: SessionRow[] | null;
 };
 
@@ -71,7 +74,7 @@ const WORKSHOP_SELECT = `
   default_instructor_id,
   workshop_batches (
     id, batch_label, status, date_label, start_date, duration_label, num_sessions,
-    price, original_price, seat_limit,
+    price, original_price, seat_limit, registration_open, registration_deadline,
     batch_sessions ( session_order, title, about, duration_label, scheduled_at, topics, assignment, resources )
   )
 `;
@@ -226,6 +229,14 @@ function mapRow(
     // Live remaining seats from batch_seat_status; fall back to the limit only
     // if the view had no row for this batch.
     remainingSeats: primaryRemaining ?? batch?.seat_limit ?? 0,
+    registrationOpen: batch?.registration_open ?? true,
+    registrationDeadline: batch?.registration_deadline ?? null,
+    // Evaluated here (server) so the page renders the right CTA immediately;
+    // the client re-checks on a timer to close the form live.
+    registrationClosed: isRegistrationClosed({
+      registrationOpen: batch?.registration_open ?? true,
+      registrationDeadline: batch?.registration_deadline ?? null,
+    }),
     instructor:
       (row.default_instructor_id && instructorNames.get(row.default_instructor_id)) ||
       'DTA Team',

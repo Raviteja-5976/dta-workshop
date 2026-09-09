@@ -7,6 +7,7 @@ import { createRazorpayPaymentLink } from '@/lib/razorpay';
 import { revalidatePath } from 'next/cache';
 import { isMock } from '@/lib/supabase/config';
 import { sendRegistrationConfirmedEmail } from '@/lib/email/notifications';
+import { formatDeadline, isRegistrationClosed } from '@/lib/datetime';
 
 /**
  * Generates a Razorpay Payment Link for a student registration.
@@ -235,7 +236,7 @@ export async function registerStudentAction(batchId: string) {
     // 2. Fetch batch metadata (price & workshop details)
     const { data: batch, error: batchError } = await supabase
       .from('workshop_batches')
-      .select('price, workshop_id, workshops(title)')
+      .select('price, workshop_id, registration_open, registration_deadline, workshops(title)')
       .eq('id', batchId)
       .single();
 
@@ -258,6 +259,24 @@ export async function registerStudentAction(batchId: string) {
     let registrationStatus = existingReg?.status;
 
     if (!existingReg) {
+      // Registration window is enforced here, not just in the UI: this action is
+      // a public POST endpoint. Students who already hold a registration keep
+      // their payment link so a deadline can't strand them mid-checkout.
+      if (
+        isRegistrationClosed({
+          registrationOpen: batch.registration_open,
+          registrationDeadline: batch.registration_deadline,
+        })
+      ) {
+        const deadlineText = batch.registration_deadline
+          ? ` The deadline was ${formatDeadline(batch.registration_deadline)}.`
+          : '';
+        return {
+          success: false,
+          error: `Registrations for this batch are closed.${deadlineText}`,
+        };
+      }
+
       // Create pending registration
       const { data: newReg, error: regError } = await supabase
         .from('registrations')
