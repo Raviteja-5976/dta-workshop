@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { NeoButton } from '@/components/UI/NeoButton';
 import { NeoCard } from '@/components/UI/NeoCard';
 import { supabase, isMock } from '@/lib/supabase';
+import { registerStudentAction } from '@/actions/payments';
 import {
   LogOut,
   User,
@@ -27,7 +28,7 @@ export default function RegistrationDetailPage() {
 
   const [reg, setReg] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [payment, setPayment] = useState<any>(null);
+  const [paying, setPaying] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -113,14 +114,6 @@ export default function RegistrationDetailPage() {
             .eq('batch_id', dbReg.batch_id)
             .order('session_order', { ascending: true });
           setSessions(dbSessions || []);
-        } else if (dbReg.status === 'pending') {
-          const { data: dbPayment } = await supabase
-            .from('payments')
-            .select('receipt_url, amount')
-            .eq('registration_id', dbReg.id)
-            .eq('status', 'pending')
-            .maybeSingle();
-          setPayment(dbPayment || null);
         }
       } catch (err) {
         console.error('Error fetching registration details:', err);
@@ -137,6 +130,29 @@ export default function RegistrationDetailPage() {
     await signOut();
     router.push('/auth');
     router.refresh();
+  };
+
+  // Goes through the server rather than a stored link, so the student is always
+  // charged the batch's current price (and free batches confirm without payment).
+  const handleCompletePayment = async () => {
+    if (!reg?.batch_id) return;
+    setPaying(true);
+    try {
+      const res = await registerStudentAction(reg.batch_id);
+      if (res.success && res.alreadyConfirmed) {
+        window.location.reload();
+        return;
+      }
+      if (res.success && res.paymentLink) {
+        router.push(res.paymentLink);
+        return;
+      }
+      alert(res.error || 'Could not continue to payment. Please try again.');
+    } catch (e) {
+      console.error(e);
+      alert('An unexpected error occurred. Please try again.');
+    }
+    setPaying(false);
   };
 
   if (loading || (user && loadingData)) {
@@ -159,6 +175,7 @@ export default function RegistrationDetailPage() {
   const userName = user.user_metadata?.full_name || userEmail.split('@')[0];
   const workshop = reg?.workshop_batches?.workshops;
   const batch = reg?.workshop_batches;
+  const isFreeBatch = Number(batch?.price ?? 0) <= 0;
 
   return (
     <div className="min-h-screen bg-bg-cream bg-grid-pattern pb-12">
@@ -205,7 +222,7 @@ export default function RegistrationDetailPage() {
             <NeoCard variant="white" borderSize="thick" shadowSize="large" className="p-8 md:p-12 space-y-6 text-left">
               <div className="flex items-center gap-1.5 border-2 border-deep-navy bg-coral px-3 py-1 rounded-full text-xs font-display font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#1B1F3B] text-white self-start w-fit">
                 <Clock size={12} />
-                Pending Payment
+                {isFreeBatch ? 'Pending Confirmation' : 'Pending Payment'}
               </div>
 
               <div className="space-y-2">
@@ -223,7 +240,9 @@ export default function RegistrationDetailPage() {
               <div className="p-4 border-2 border-deep-navy bg-bg-cream rounded-2xl space-y-2 font-semibold text-sm">
                 <div className="flex justify-between items-baseline">
                   <span className="text-deep-navy/50">Tuition Price:</span>
-                  <span className="font-display font-black text-lg text-deep-navy">₹{batch?.price}</span>
+                  <span className="font-display font-black text-lg text-deep-navy">
+                    {isFreeBatch ? 'FREE' : `₹${batch?.price}`}
+                  </span>
                 </div>
                 <div className="flex justify-between items-baseline">
                   <span className="text-deep-navy/50">Seat Hold Status:</span>
@@ -231,18 +250,20 @@ export default function RegistrationDetailPage() {
                 </div>
               </div>
 
-              {payment?.receipt_url ? (
-                <a href={payment.receipt_url} className="w-full block">
-                  <NeoButton variant="orange" size="md" className="w-full py-4 text-base">
-                    Complete Checkout / Pay Now
-                    <ChevronRight size={16} className="ml-1" />
-                  </NeoButton>
-                </a>
-              ) : (
-                <div className="p-4 bg-yellow/10 border-2 border-yellow rounded-xl text-deep-navy text-xs font-bold text-center">
-                  Payment Link is being generated. Please reload in a few seconds.
-                </div>
-              )}
+              <NeoButton
+                variant="orange"
+                size="md"
+                className="w-full py-4 text-base"
+                onClick={handleCompletePayment}
+                disabled={paying}
+              >
+                {paying
+                  ? 'Please wait...'
+                  : isFreeBatch
+                    ? 'Confirm My Free Seat'
+                    : 'Complete Checkout / Pay Now'}
+                <ChevronRight size={16} className="ml-1" />
+              </NeoButton>
             </NeoCard>
           </div>
         ) : (

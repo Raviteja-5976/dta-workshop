@@ -204,6 +204,7 @@ export default function DashboardPage() {
               const workshop = reg.workshop_batches?.workshops;
               const batch = reg.workshop_batches;
               const isConfirmed = reg.status === 'confirmed';
+              const isFreeBatch = Number(batch?.price ?? 0) <= 0;
 
               return (
                 <Link key={reg.id} href={`/dashboard/${reg.id}`} className="block h-full">
@@ -221,7 +222,7 @@ export default function DashboardPage() {
                         }`}
                       >
                         {isConfirmed ? <CheckCircle size={12} /> : <Clock size={12} />}
-                        {isConfirmed ? 'Confirmed' : 'Pending Payment'}
+                        {isConfirmed ? 'Confirmed' : isFreeBatch ? 'Pending' : 'Pending Payment'}
                       </span>
                       <h3 className="font-display font-black text-xl text-deep-navy leading-tight">
                         {workshop?.title || 'Workshop'}
@@ -236,10 +237,10 @@ export default function DashboardPage() {
 
                     <div className="flex items-center justify-between border-t-2 border-deep-navy/10 pt-4">
                       <span className="font-display font-black text-lg text-deep-navy">
-                        ₹{batch?.price}
+                        {isFreeBatch ? 'FREE' : `₹${batch?.price}`}
                       </span>
                       <span className="inline-flex items-center gap-1 font-display font-black text-xs uppercase text-primary-orange">
-                        {isConfirmed ? 'View Details' : 'Complete Payment'}
+                        {isConfirmed ? 'View Details' : isFreeBatch ? 'Confirm Seat' : 'Complete Payment'}
                         <ChevronRight size={14} />
                       </span>
                     </div>

@@ -12,21 +12,7 @@ interface RazorpayPaymentLinkResponse {
   status: string;
 }
 
-/**
- * Creates a Razorpay Payment Link for a registration.
- * If credentials are not configured or in mock mode, it returns a simulated payment link.
- * 
- * @param registrationId The registration UUID.
- * @param amountInRupees The amount in Rupees (INR).
- * @param customer The customer name, email, and optional phone.
- * @param description Description of the workshop run.
- */
-export async function createRazorpayPaymentLink(
-  registrationId: string,
-  amountInRupees: number,
-  customer: CustomerInfo,
-  description: string
-): Promise<RazorpayPaymentLinkResponse> {
+function getRazorpayCredentials() {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -36,6 +22,32 @@ export async function createRazorpayPaymentLink(
     !keySecret ||
     keyId.includes('your_key_id') ||
     keySecret.includes('your_key_secret');
+
+  return { keyId, keySecret, isRazorpayMock };
+}
+
+/**
+ * Creates a Razorpay Payment Link for a registration.
+ * If credentials are not configured or in mock mode, it returns a simulated payment link.
+ *
+ * @param registrationId The registration UUID.
+ * @param amountInRupees The amount in Rupees (INR). Must be at least ₹1 — free batches
+ *   should skip payment entirely instead of calling this.
+ * @param customer The customer name, email, and optional phone.
+ * @param description Description of the workshop run.
+ */
+export async function createRazorpayPaymentLink(
+  registrationId: string,
+  amountInRupees: number,
+  customer: CustomerInfo,
+  description: string
+): Promise<RazorpayPaymentLinkResponse> {
+  // Razorpay's minimum charge is ₹1 (100 paise); anything lower is rejected by the API.
+  if (!Number.isFinite(amountInRupees) || amountInRupees < 1) {
+    throw new Error(`Cannot create a payment link for ₹${amountInRupees}. The minimum is ₹1.`);
+  }
+
+  const { keyId, keySecret, isRazorpayMock } = getRazorpayCredentials();
 
   if (isRazorpayMock) {
     // Generate a mock payment link for testing
@@ -113,5 +125,30 @@ export async function createRazorpayPaymentLink(
   } catch (error) {
     console.error('Failed to create Razorpay payment link:', error);
     throw error;
+  }
+}
+
+/**
+ * Cancels a Razorpay Payment Link so it can no longer be paid. Used when a stored
+ * link is stale (the batch price changed or the batch became free).
+ * Best-effort: failures are logged, never thrown — e.g. the link may already be
+ * paid or expired, in which case the webhook remains the source of truth.
+ */
+export async function cancelRazorpayPaymentLink(paymentLinkId: string | null | undefined): Promise<void> {
+  const { keyId, keySecret, isRazorpayMock } = getRazorpayCredentials();
+  if (isRazorpayMock || !paymentLinkId || paymentLinkId.startsWith('plink_mock_')) return;
+
+  try {
+    const authHeader = btoa(`${keyId}:${keySecret}`);
+    const response = await fetch(`https://api.razorpay.com/v1/payment_links/${paymentLinkId}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${authHeader}` },
+    });
+
+    if (!response.ok) {
+      console.warn(`Razorpay: could not cancel payment link ${paymentLinkId}:`, await response.text());
+    }
+  } catch (error) {
+    console.warn(`Razorpay: failed to cancel payment link ${paymentLinkId}:`, error);
   }
 }

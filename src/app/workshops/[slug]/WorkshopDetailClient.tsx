@@ -472,7 +472,9 @@ export default function WorkshopDetailClient({
               {/* Price Details */}
               <div className="space-y-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display font-black text-4xl text-deep-navy">₹{workshop.price}</span>
+                  <span className="font-display font-black text-4xl text-deep-navy">
+                    {workshop.price === 0 ? 'FREE' : `₹${workshop.price}`}
+                  </span>
                   {workshop.originalPrice && (
                     <span className="font-display font-bold text-base text-deep-navy/40 line-through">
                       ₹{workshop.originalPrice}
@@ -508,7 +510,7 @@ export default function WorkshopDetailClient({
                   <>
                     <div className="w-full border-3 border-deep-navy bg-mint rounded-xl px-4 py-2.5 text-center font-display font-black text-sm uppercase text-deep-navy shadow-[2px_2px_0px_0px_#1B1F3B] flex items-center justify-center gap-1.5">
                       <CheckCircle2 size={16} className="stroke-[3]" />
-                      {isConfirmed ? "You're Registered" : 'Payment Pending'}
+                      {isConfirmed ? "You're Registered" : workshop.price === 0 ? 'Confirmation Pending' : 'Payment Pending'}
                     </div>
                     <NeoButton
                       variant="orange"
@@ -516,7 +518,7 @@ export default function WorkshopDetailClient({
                       className="w-full"
                       onClick={() => router.push('/dashboard')}
                     >
-                      {isConfirmed ? 'Go to Dashboard' : 'Complete Payment'}
+                      {isConfirmed ? 'Go to Dashboard' : workshop.price === 0 ? 'Confirm Seat' : 'Complete Payment'}
                       <ChevronRight size={14} className="ml-1" />
                     </NeoButton>
                   </>
@@ -562,11 +564,13 @@ export default function WorkshopDetailClient({
         <div className="fixed bottom-0 left-0 w-full bg-white border-t-3 border-deep-navy p-4 flex items-center justify-between gap-4 z-40 lg:hidden shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
           <div className="text-left">
             <span className="font-display font-bold text-[10px] text-deep-navy/55 uppercase leading-none block">Featured Batch</span>
-            <span className="font-display font-black text-xl text-deep-navy mt-1 block">₹{workshop.price}</span>
+            <span className="font-display font-black text-xl text-deep-navy mt-1 block">
+              {workshop.price === 0 ? 'FREE' : `₹${workshop.price}`}
+            </span>
           </div>
           {isRegistered ? (
             <NeoButton variant="mint" size="sm" onClick={() => router.push('/dashboard')}>
-              {isConfirmed ? 'Registered ✓' : 'Payment Pending'} <ChevronRight size={12} className="ml-0.5" />
+              {isConfirmed ? 'Registered ✓' : workshop.price === 0 ? 'Confirm Seat' : 'Payment Pending'} <ChevronRight size={12} className="ml-0.5" />
             </NeoButton>
           ) : closed ? (
             <span className="px-3 py-2 border-3 border-deep-navy bg-coral rounded-xl font-display font-black text-xs uppercase text-white inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#1B1F3B]">

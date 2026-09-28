@@ -3,7 +3,7 @@
 import { assertAdmin } from '@/lib/auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { createRazorpayPaymentLink } from '@/lib/razorpay';
+import { cancelRazorpayPaymentLink, createRazorpayPaymentLink } from '@/lib/razorpay';
 import { revalidatePath } from 'next/cache';
 import { isMock } from '@/lib/supabase/config';
 import { sendRegistrationConfirmedEmail } from '@/lib/email/notifications';
@@ -24,6 +24,13 @@ export async function generateRazorpayLinkAction(
   try {
     await assertAdmin();
 
+    if (amount <= 0) {
+      return {
+        success: false,
+        error: 'This batch is free, so no payment link is needed. Confirm the registration directly instead.',
+      };
+    }
+
     // 1. Call Razorpay API helper
     const result = await createRazorpayPaymentLink(registrationId, amount, customer, description);
 
@@ -37,12 +44,15 @@ export async function generateRazorpayLinkAction(
     // 2. Check if a pending payment record for this registration already exists
     const { data: existingPayment } = await supabase
       .from('payments')
-      .select('id')
+      .select('id, provider_order_id')
       .eq('registration_id', registrationId)
       .eq('status', 'pending')
       .maybeSingle();
 
     if (existingPayment) {
+      // The old link is being replaced; stop it from being paid as well.
+      await cancelRazorpayPaymentLink(existingPayment.provider_order_id);
+
       // Update existing pending payment with new link details
       const { error: updateError } = await supabase
         .from('payments')
@@ -245,7 +255,9 @@ export async function registerStudentAction(batchId: string) {
     }
 
     const workshopTitle = (batch.workshops as any)?.title || 'Workshop';
-    const amount = Number(batch.price || 999);
+    // `??`, not `||`: a price of 0 is a real (free) price, not a missing one.
+    const amount = Number(batch.price ?? 0);
+    const isFree = amount <= 0;
 
     // 3. Check if already registered
     const { data: existingReg } = await supabase
@@ -301,31 +313,89 @@ export async function registerStudentAction(batchId: string) {
       return { success: true, alreadyConfirmed: true };
     }
 
-    // 4. Generate or fetch pending payment link
+    // 4. Look up any pending payment link created earlier for this registration
     const { data: existingPay } = await supabase
       .from('payments')
-      .select('receipt_url')
+      .select('id, amount, provider_order_id, receipt_url')
       .eq('registration_id', registrationId)
       .eq('status', 'pending')
       .maybeSingle();
 
-    let paymentLink = existingPay?.receipt_url;
+    // A link created before the batch price changed (or before it became free) would
+    // charge the old amount, so it is only reused while the amount still matches.
+    const existingLinkIsCurrent = !!existingPay?.receipt_url && Number(existingPay.amount) === amount;
+    if (existingPay && !existingLinkIsCurrent) {
+      await cancelRazorpayPaymentLink(existingPay.provider_order_id);
+    }
 
-    if (!paymentLink) {
-      const customer = {
-        name: user.user_metadata?.full_name || 'Student',
-        email: user.email || ''
-      };
-      
-      // Call Razorpay API (will return mock URL in mock mode)
-      const result = await createRazorpayPaymentLink(
-        registrationId, 
-        amount, 
-        customer, 
-        `Payment for ${workshopTitle}`
-      );
-      paymentLink = result.short_url;
+    // 5. Free batch: no payment step, confirm the seat directly
+    if (isFree) {
+      // Don't let a student undo an admin cancellation just by clicking Register again.
+      if (registrationStatus !== 'pending') {
+        return {
+          success: false,
+          error: `This registration is ${registrationStatus}. Please contact support to re-enroll.`,
+        };
+      }
 
+      if (existingPay) {
+        const { error: payDeleteError } = await supabase
+          .from('payments')
+          .delete()
+          .eq('id', existingPay.id);
+
+        if (payDeleteError) throw payDeleteError;
+      }
+
+      const { error: confirmError } = await supabase
+        .from('registrations')
+        .update({
+          status: 'confirmed',
+          confirmed_at: new Date().toISOString(),
+          confirmation_code: `DTA-CONF-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+        })
+        .eq('id', registrationId);
+
+      if (confirmError) throw confirmError;
+
+      // Confirmation email (idempotent; best-effort).
+      await sendRegistrationConfirmedEmail(registrationId);
+
+      return { success: true, alreadyConfirmed: true };
+    }
+
+    // 6. Paid batch: reuse the current link, or create a new one at the current price
+    if (existingLinkIsCurrent) {
+      return { success: true, registrationId, paymentLink: existingPay!.receipt_url as string };
+    }
+
+    const customer = {
+      name: user.user_metadata?.full_name || 'Student',
+      email: user.email || ''
+    };
+
+    // Call Razorpay API (will return mock URL in mock mode)
+    const result = await createRazorpayPaymentLink(
+      registrationId,
+      amount,
+      customer,
+      `Payment for ${workshopTitle}`
+    );
+
+    if (existingPay) {
+      // Replace the stale link on the existing pending payment row
+      const { error: payUpdateError } = await supabase
+        .from('payments')
+        .update({
+          amount: amount,
+          provider_order_id: result.id,
+          receipt_url: result.short_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingPay.id);
+
+      if (payUpdateError) throw payUpdateError;
+    } else {
       // Insert pending payment row
       const { error: payInsertError } = await supabase
         .from('payments')
@@ -344,7 +414,7 @@ export async function registerStudentAction(batchId: string) {
       if (payInsertError) throw payInsertError;
     }
 
-    return { success: true, registrationId, paymentLink };
+    return { success: true, registrationId, paymentLink: result.short_url };
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to complete registration.' };
   }

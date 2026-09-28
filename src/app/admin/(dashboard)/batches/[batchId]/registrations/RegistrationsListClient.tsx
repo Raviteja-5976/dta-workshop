@@ -235,6 +235,10 @@ export const RegistrationsListClient: React.FC<RegistrationsListClientProps> = (
                             <span className="text-xs font-bold text-success inline-flex items-center gap-1">
                               Verified Paid
                             </span>
+                          ) : batchPrice <= 0 ? (
+                            <span className="text-xs font-bold text-deep-navy/50">
+                              {reg.status === 'confirmed' ? 'Free batch' : 'Free batch — confirm directly'}
+                            </span>
                           ) : payLink ? (
                             <div className="flex items-center gap-2">
                               {/* Open link */}
